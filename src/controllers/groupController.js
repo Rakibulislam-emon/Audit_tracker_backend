@@ -1,5 +1,6 @@
 import Group from "../models/Group.js";
-import { creationInfo } from "../utils/creationInfo.js";
+import { createdBy, updatedBy } from "../utils/helper.js";
+
 // get all groups
 export const getAllGroups = async (req, res) => {
   try {
@@ -37,7 +38,7 @@ export const createGroup = async (req, res) => {
     }
     const newGroup = new Group({
       name,
-      ...creationInfo(req),
+      ...createdBy(req),
     });
     const savedGroup = await newGroup.save();
     res.status(201).json(savedGroup);
@@ -58,7 +59,8 @@ export const updateGroup = async (req, res) => {
     }
     const updatedGroup = await Group.findByIdAndUpdate(
       id,
-      { name },
+      { name ,...updatedBy(req),},
+      
       { new: true, runValidators: true }
     );
     if (!updatedGroup) {
