@@ -62,7 +62,7 @@ export const updateCompany = async (req, res) => {
 
     const updatedCompany = await Company.findByIdAndUpdate(
       companyId,
-      { name, group, sector, address ,...updatedBy(req)},
+      { name, group, sector, address, ...updatedBy(req) },
       { new: true, runValidators: true }
     );
 
