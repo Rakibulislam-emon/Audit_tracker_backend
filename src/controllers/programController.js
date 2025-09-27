@@ -8,7 +8,9 @@ export const getAllPrograms = async (req, res) => {
     const programs = await Program.find()
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
-    res.status(200).json(programs);
+    res
+      .status(200)
+      .json({ programs, message: "Programs retrieved successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -22,7 +24,9 @@ export const getProgramById = async (req, res) => {
     if (!program) {
       return res.status(404).json({ message: "Program not found" });
     }
-    res.status(200).json(program);
+    res
+      .status(200)
+      .json({ program, message: "Program retrieved successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -48,7 +52,7 @@ export const createProgram = async (req, res) => {
     const savedProgram = await newProgram.save();
     res
       .status(201)
-      .json({ data: savedProgram, message: "Program created successfully" });
+      .json({ savedProgram, message: "Program created successfully" });
   } catch (error) {
     res
       .status(400)
@@ -73,7 +77,7 @@ export const updateProgram = async (req, res) => {
 
     res
       .status(200)
-      .json({ data: updatedProgram, message: "Program updated successfully" });
+      .json({ updatedProgram, message: "Program updated successfully" });
   } catch (error) {
     res
       .status(400)

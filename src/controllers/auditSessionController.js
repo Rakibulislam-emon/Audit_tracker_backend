@@ -9,8 +9,7 @@ export const getAllAuditSessions = async (req, res) => {
       .populate("checkType", "name")
       .populate("schedule", "title")
       .populate("createdBy", "name email");
-    res.status(200).json({
-      auditSessions,
+    res.status(200).json(auditSessions, {
       message: "Audit sessions retrieved successfully",
     });
   } catch (error) {
@@ -29,10 +28,9 @@ export const getAuditSessionById = async (req, res) => {
     if (!auditSession) {
       return res.status(404).json({ message: "Audit session not found" });
     }
-    res.status(200).json({
-      auditSession,
-      message: "Audit session retrieved successfully",
-    });
+    res
+      .status(200)
+      .json({ auditSession, message: "Audit session retrieved successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
@@ -40,8 +38,15 @@ export const getAuditSessionById = async (req, res) => {
 
 export const createAuditSession = async (req, res) => {
   try {
-    const { startDate, endDate, workflowStatus, template, site, checkType, schedule } =
-      req.body;
+    const {
+      startDate,
+      endDate,
+      workflowStatus,
+      template,
+      site,
+      checkType,
+      schedule,
+    } = req.body;
 
     if (!template || !site || !checkType || !schedule) {
       return res.status(400).json({
@@ -60,10 +65,8 @@ export const createAuditSession = async (req, res) => {
       ...createdBy(req),
     });
     const savedAuditSession = await newAuditSession.save();
-    res.status(201).json({
-      savedAuditSession,
-      message: "Audit session created successfully",
-    });
+
+    res.status(201).json({ savedAuditSession, message: "Audit session created successfully" });
   } catch (error) {
     res.status(400).json({ message: "Error creating audit session" });
   }
@@ -94,7 +97,7 @@ export const updateAuditSession = async (req, res) => {
       return res.status(404).json({ message: "Audit session not found" });
     }
 
-    res.status(200).json({
+    res.status(200).json( {
       updatedAuditSession,
       message: "Audit session updated successfully",
     });

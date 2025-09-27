@@ -8,7 +8,7 @@ export const getAllTemplates = async (req, res) => {
     const templates = await Template.find()
       .populate("company", "name")
       .populate("createdBy", "name email");
-    res.status(200).json(templates);
+    res.status(200).json({ templates });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -22,7 +22,7 @@ export const getTemplateById = async (req, res) => {
     if (!template) {
       return res.status(404).json({ message: "Template not found" });
     }
-    res.status(200).json(template);
+    res.status(200).json({ template });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -47,7 +47,7 @@ export const createTemplate = async (req, res) => {
     });
     const savedTemplate = await newTemplate.save();
 
-    res.status(201).json(savedTemplate, { message: "Template created successfully" });
+    res.status(201).json({ savedTemplate, message: "Template created successfully" });
   } catch (error) {
     res
       .status(400)
@@ -70,7 +70,7 @@ export const updateTemplate = async (req, res) => {
       return res.status(404).json({ message: "Template not found" });
     }
 
-    res.status(200).json(updatedTemplate, { message: "Template updated successfully" });
+    res.status(200).json({ updatedTemplate, message: "Template updated successfully" });
   } catch (error) {
     res
       .status(400)

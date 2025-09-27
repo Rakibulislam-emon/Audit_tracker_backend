@@ -6,7 +6,7 @@ import { createdBy, updatedBy } from "../utils/helper.js";
 export const getAllRules = async (req, res) => {
   try {
     const rules = await Rule.find().populate("createdBy", "name email");
-    res.status(200).json(rules);
+    res.status(200).json({ rules });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -21,7 +21,7 @@ export const getRuleById = async (req, res) => {
     if (!rule) {
       return res.status(404).json({ message: "Rule not found" });
     }
-    res.status(200).json(rule);
+    res.status(200).json({ rule });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -38,7 +38,7 @@ export const createRule = async (req, res) => {
     const newRule = new Rule({ name, description, ...createdBy(req) });
     const savedRule = await newRule.save();
 
-    res.status(201).json(savedRule, { message: "Rule created successfully" });
+    res.status(201).json({ savedRule, message: "Rule created successfully" });
   } catch (error) {
     res
       .status(400)
@@ -61,7 +61,7 @@ export const updateRule = async (req, res) => {
       return res.status(404).json({ message: "Rule not found" });
     }
 
-    res.status(200).json(updatedRule, { message: "Rule updated successfully" });
+    res.status(200).json({ updatedRule, message: "Rule updated successfully" });
   } catch (error) {
     res
       .status(400)

@@ -10,7 +10,7 @@ export const getAllSchedules = async (req, res) => {
       .populate("updatedBy", "name email");
     res
       .status(200)
-      .json({ data: schedules, message: "Schedules retrieved successfully" });
+      .json({ schedules, message: "Schedules retrieved successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -28,7 +28,7 @@ export const getScheduleById = async (req, res) => {
     }
     res
       .status(200)
-      .json({ data: schedule, message: "Schedule retrieved successfully" });
+      .json({ schedule, message: "Schedule retrieved successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -56,7 +56,7 @@ export const createSchedule = async (req, res) => {
     const savedSchedule = await newSchedule.save();
     res
       .status(201)
-      .json({ data: savedSchedule, message: "Schedule created successfully" });
+      .json({ savedSchedule, message: "Schedule created successfully" });
   } catch (error) {
     res
       .status(400)
@@ -79,8 +79,7 @@ export const updateSchedule = async (req, res) => {
       return res.status(404).json({ message: "Schedule not found" });
     }
 
-    res.status(200).json({
-      data: updatedSchedule,
+    res.status(200).json({ updatedSchedule,
       message: "Schedule updated successfully",
     });
   } catch (error) {

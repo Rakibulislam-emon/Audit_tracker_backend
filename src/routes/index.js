@@ -1,5 +1,9 @@
 import express from "express";
+
+const router = express.Router();
+
 import auth from "../middleware/auth.js";
+import auditSessionRoutes from "./auditSessionRoutes.js";
 import checkTypeRoutes from "./checkTypeRoutes.js";
 import companyRoutes from "./companyRoutes.js";
 import groupRoutes from "./groupRoutes.js";
@@ -8,10 +12,13 @@ import questionRoutes from "./questionRoutes.js";
 import ruleRoutes from "./ruleRoutes.js";
 import scheduleRoutes from "./scheduleRoutes.js";
 import siteRoutes from "./siteRoutes.js";
+import teamRoutes from "./teamRoutes.js";
 import templateRoutes from "./templateRoutes.js";
 import userRoutes from "./userRoutes.js";
-import auditSessionRoutes from "./auditSessionRoutes.js";
-const router = express.Router();
+import observationRoutes from "./observationRoutes.js";
+  import problemRoutes from "./problemRoutes.js";
+ import fixAction from "./fixActionRoutes.js";
+
 
 router.use("/api/users", userRoutes);
 router.use("/api/groups", auth, groupRoutes);
@@ -24,7 +31,10 @@ router.use("/api/questions", auth, questionRoutes);
 router.use("/api/programs", auth, programRoutes);
 router.use("/api/schedules", auth, scheduleRoutes);
 router.use("/api/audit-sessions", auth, auditSessionRoutes);
-
+router.use("/api/teams", auth, teamRoutes);
+router.use("/api/observations", auth, observationRoutes);
+router.use("/api/problems", auth, problemRoutes);
+router.use("/api/fix-actions", auth, fixAction);
 
 
 export default router;
