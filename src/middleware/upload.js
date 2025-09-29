@@ -1,51 +1,102 @@
-import fs from "fs";
 import multer from "multer";
-import path from "path";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import cloudinary from "../config/cloudinary.js";
 
-// step 1: upload folder creation
-const uploadDir = "uploads/proofs";
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Allowed MIME types
+const ALLOWED_MIME_TYPES = {
+  image: [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+  ],
+  document: [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/plain",
+    "text/csv",
+  ],
+  video: [
+    "video/mp4",
+    "video/mpeg",
+    "video/quicktime",
+    "video/x-msvideo",
+    "video/webm",
+  ],
+  audio: ["audio/mpeg", "audio/wav", "audio/ogg", "audio/webm"],
+};
 
-// step 2: multer storage configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    // step 3: make unique file name
-    const uniqueName = `${Date.now()}-${Math.round(
-      Math.random() * 1e9
-    )}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
+const getAllowedMimeTypes = () => [
+  ...ALLOWED_MIME_TYPES.image,
+  ...ALLOWED_MIME_TYPES.document,
+  ...ALLOWED_MIME_TYPES.video,
+  ...ALLOWED_MIME_TYPES.audio,
+];
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    let resource_type = "auto";
+
+    if (ALLOWED_MIME_TYPES.document.includes(file.mimetype)) {
+      resource_type = "raw";
+    } else if (ALLOWED_MIME_TYPES.video.includes(file.mimetype)) {
+      resource_type = "video";
+    } else if (ALLOWED_MIME_TYPES.audio.includes(file.mimetype)) {
+      resource_type = "video"; // Cloudinary treats audio as video
+    }
+
+    return {
+      folder: "audit-proofs",
+      public_id: `proof_${Date.now()}_${Math.round(Math.random() * 1e9)}`,
+      resource_type,
+      allowed_formats: [
+        "jpg",
+        "png",
+        "gif",
+        "webp",
+        "pdf",
+        "doc",
+        "docx",
+        "xls",
+        "xlsx",
+        "txt",
+        "csv",
+        "mp4",
+        "mpeg",
+        "avi",
+        "webm",
+        "mp3",
+        "wav",
+        "ogg",
+      ],
+    };
   },
 });
 
-// step 4: upload files types
-
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = [
-    "image/jpeg",
-    "image/png",
-    "image/gif", // Images
-    "application/pdf", // PDF
-    "video/mp4",
-    "video/mpeg", // Videos
-    "audio/mpeg", // Audio
-  ];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true); // Accept file
+  const allowed = getAllowedMimeTypes();
+  if (allowed.includes(file.mimetype)) {
+    cb(null, true);
   } else {
-    cb(new Error("File type not allowed"), false); // Reject file
+    cb(
+      new Error(
+        `Invalid file type: ${file.mimetype}. Only images, documents, videos, and audio are allowed.`
+      )
+    );
   }
 };
 
-// step 5: multer upload instance
-
 const upload = multer({
-  storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: fileFilter,
+  storage,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50 MB
+  },
+  fileFilter,
 });
+
 export default upload;

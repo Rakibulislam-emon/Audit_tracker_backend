@@ -4,7 +4,7 @@ dotenv.config();
 import express from "express";
 import config from "./config/config.js";
 import connectDB from "./config/db.js";
-
+// import path from 'path';
 // Import routes
 import routes from "./routes/index.js";
 
@@ -17,6 +17,10 @@ app.use(express.json()); // Parse JSON bodies
 connectDB();
 
 app.use("/", routes);
+
+//  // Static files serve করার জন্য (uploads folder)
+// app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
 
 // Health check
 app.get("/", (req, res) => {
