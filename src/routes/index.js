@@ -41,7 +41,7 @@ router.use("/api/fix-actions",  fixAction);
 
 router.use("/api/proofs", proofRoutes);
 
- router.use('/api/reports', reportRoutes);
+ router.use('/api/reports',auth, reportRoutes);
 
 
 export default router;

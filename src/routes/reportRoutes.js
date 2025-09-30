@@ -15,4 +15,7 @@ router.delete('/:id', reportController.deleteReport);
 router.get('/audit-session/:auditSessionId', reportController.getReportsByAuditSession);
 router.patch('/:id/status', reportController.updateReportStatus);
 
+// Report statistics
+router.get('/statistics/overview', reportController.getReportStatistics);
+
 export default router;
