@@ -1,84 +1,85 @@
-// // src/controllers/ruleController.js
+// src/controllers/ruleController.js
 
-// import Rule from "../models/Rule.js";
-// import { createdBy, updatedBy } from "../utils/helper.js";
 
-// export const getAllRules = async (req, res) => {
-//   try {
-//     const rules = await Rule.find().populate("createdBy", "name email");
-//     res.status(200).json({ rules });
-//   } catch (error) {
-//     res.status(500).json({ message: "Server error", error: error.message });
-//   }
-// };
+import Rule from "../models/Rule.js";
+import { createdBy, updatedBy } from "../utils/helper.js";
 
-// export const getRuleById = async (req, res) => {
-//   try {
-//     const rule = await Rule.findById(req.params.id).populate(
-//       "createdBy",
-//       "name email"
-//     );
-//     if (!rule) {
-//       return res.status(404).json({ message: "Rule not found" });
-//     }
-//     res.status(200).json({ rule });
-//   } catch (error) {
-//     res.status(500).json({ message: "Server error", error: error.message });
-//   }
-// };
+export const getAllRules = async (req, res) => {
+  try {
+    const rules = await Rule.find().populate("createdBy", "name email");
+    res.status(200).json({ rules });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
-// export const createRule = async (req, res) => {
-//   try {
-//     const { name, description } = req.body;
+export const getRuleById = async (req, res) => {
+  try {
+    const rule = await Rule.findById(req.params.id).populate(
+      "createdBy",
+      "name email"
+    );
+    if (!rule) {
+      return res.status(404).json({ message: "Rule not found" });
+    }
+    res.status(200).json({ rule });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
 
-//     if (!name) {
-//       return res.status(400).json({ message: "Name is required" });
-//     }
+export const createRule = async (req, res) => {
+  try {
+    const { name, description } = req.body;
 
-//     const newRule = new Rule({ name, description, ...createdBy(req) });
-//     const savedRule = await newRule.save();
+    if (!name) {
+      return res.status(400).json({ message: "Name is required" });
+    }
 
-//     res.status(201).json({ savedRule, message: "Rule created successfully" });
-//   } catch (error) {
-//     res
-//       .status(400)
-//       .json({ message: "Error creating rule", error: error.message });
-//   }
-// };
+    const newRule = new Rule({ name, description, ...createdBy(req) });
+    const savedRule = await newRule.save();
 
-// export const updateRule = async (req, res) => {
-//   try {
-//     const { name, description } = req.body;
-//     const ruleId = req.params.id;
+    res.status(201).json({ savedRule, message: "Rule created successfully" });
+  } catch (error) {
+    res
+      .status(400)
+      .json({ message: "Error creating rule", error: error.message });
+  }
+};
 
-//     const updatedRule = await Rule.findByIdAndUpdate(
-//       ruleId,
-//       { name, description, ...updatedBy(req) },
-//       { new: true, runValidators: true }
-//     );
+export const updateRule = async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    const ruleId = req.params.id;
 
-//     if (!updatedRule) {
-//       return res.status(404).json({ message: "Rule not found" });
-//     }
+    const updatedRule = await Rule.findByIdAndUpdate(
+      ruleId,
+      { name, description, ...updatedBy(req) },
+      { new: true, runValidators: true }
+    );
 
-//     res.status(200).json({ updatedRule, message: "Rule updated successfully" });
-//   } catch (error) {
-//     res
-//       .status(400)
-//       .json({ message: "Error updating rule", error: error.message });
-//   }
-// };
+    if (!updatedRule) {
+      return res.status(404).json({ message: "Rule not found" });
+    }
 
-// export const deleteRule = async (req, res) => {
-//   try {
-//     const deletedRule = await Rule.findByIdAndDelete(req.params.id);
-//     if (!deletedRule) {
-//       return res.status(404).json({ message: "Rule not found" });
-//     }
-//     res.status(200).json({ message: "Rule deleted successfully" });
-//   } catch (error) {
-//     res
-//       .status(500)
-//       .json({ message: "Error deleting rule", error: error.message });
-//   }
-// };
+    res.status(200).json({ updatedRule, message: "Rule updated successfully" });
+  } catch (error) {
+    res
+      .status(400)
+      .json({ message: "Error updating rule", error: error.message });
+  }
+};
+
+export const deleteRule = async (req, res) => {
+  try {
+    const deletedRule = await Rule.findByIdAndDelete(req.params.id);
+    if (!deletedRule) {
+      return res.status(404).json({ message: "Rule not found" });
+    }
+    res.status(200).json({ message: "Rule deleted successfully" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error deleting rule", error: error.message });
+  }
+};

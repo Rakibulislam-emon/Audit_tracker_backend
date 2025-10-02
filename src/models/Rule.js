@@ -1,24 +1,18 @@
-// import mongoose from "mongoose";
+// src/models/Rule.js
 
-// import commonFields from "./commonFields.js";
-// const checkTypeSchema = new mongoose.Schema(
-//   {
-//     name: {
-//       type: String,
-//       required: true,
-//       trim: true,
-//     },
-//     description: {
-//       type: String,
-//       required: true,
-//       trim: true,
-//     },
-//     ...commonFields,
-//   },
-//   {
-//     timestamps: true,
-//   }
-// );
+import mongoose from 'mongoose';
+import commonFields from './commonFields.js';
 
-// export default mongoose.models.CheckType ||
-//   mongoose.model("CheckType", checkTypeSchema);
+const ruleSchema = new mongoose.Schema({
+  name: { 
+    type: String, 
+    required: true, 
+    trim: true 
+  },
+  description: String,
+  ...commonFields
+}, {
+  timestamps: true
+});
+
+export default mongoose.models.Rule || mongoose.model('Rule', ruleSchema);

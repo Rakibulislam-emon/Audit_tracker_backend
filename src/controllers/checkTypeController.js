@@ -46,7 +46,7 @@ export const createCheckType = async (req, res) => {
 
     res
       .status(201)
-      .json(savedCheckType, { message: "CheckType created successfully" });
+      .json({ savedCheckType, message: "CheckType created successfully" });
   } catch (error) {
     res
       .status(400)
@@ -61,7 +61,7 @@ export const updateCheckType = async (req, res) => {
 
     const updatedCheckType = await CheckType.findByIdAndUpdate(
       checkTypeId,
-      { name, description ,...updatedBy(req)},
+      { name, description, ...updatedBy(req) },
       { new: true, runValidators: true }
     );
 
@@ -69,7 +69,9 @@ export const updateCheckType = async (req, res) => {
       return res.status(404).json({ message: "CheckType not found" });
     }
 
-    res.status(200).json(updatedCheckType, { message: "CheckType updated successfully" });
+    res
+      .status(200)
+      .json({ updatedCheckType, message: "CheckType updated successfully" });
   } catch (error) {
     res
       .status(400)
