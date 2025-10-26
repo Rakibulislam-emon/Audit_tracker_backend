@@ -13,7 +13,7 @@ const router = Router();
 router.get('/', auth, authorizeRoles("admin", "sysadmin", "audit_manager", "auditor"), teamController.getAllTeams);
 router.get('/:id', auth, authorizeRoles("admin", "sysadmin", "audit_manager", "auditor"), teamController.getTeamById);
 router.post('/', auth, authorizeRoles("admin", "sysadmin", "audit_manager"), teamController.createTeam);
-router.put('/:id', auth, authorizeRoles("admin", "sysadmin", "audit_manager"), teamController.updateTeam);
+router.patch('/:id', auth, authorizeRoles("admin", "sysadmin", "audit_manager"), teamController.updateTeam);
 router.delete('/:id', auth, authorizeRoles("admin", "sysadmin", "audit_manager"), teamController.deleteTeam);
 
 export default router;
