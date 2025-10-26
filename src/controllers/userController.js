@@ -68,8 +68,10 @@ const loginUser = async (req, res) => {
     // loginUser function এ cookie settings change করুন
     res.cookie("token", token, {
       httpOnly: true,
-      secure: false, // Development এর জন্য false করুন
-      sameSite: "lax",
+      // secure: false, // Development এর জন্য false করুন
+      secure: true,
+      // sameSite: "lax",
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
     // update last login
