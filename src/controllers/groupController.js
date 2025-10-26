@@ -5,7 +5,12 @@ import { createdBy, updatedBy } from "../utils/helper.js";
 export const getAllGroups = async (req, res) => {
   try {
     const groups = await Group.find();
-    res.status(200).json(groups);
+    res.status(200).json({
+      data: groups,
+      message: "Groups fetched successfully",
+      success: true,
+      count: groups.length,
+    });
   } catch (error) {
     res
       .status(500)
@@ -31,13 +36,17 @@ export const getGroupById = async (req, res) => {
 
 // create a new group
 export const createGroup = async (req, res) => {
+  // console.log("req:", req);
   try {
-    const { name } = req.body;
-    if (!name) {
-      return res.status(400).json({ message: "Group name is required" });
+    const { name, description } = req.body;
+    if (!name || !description) {
+      return res
+        .status(400)
+        .json({ message: "Group name and description is required" });
     }
     const newGroup = new Group({
       name,
+      description,
       ...createdBy(req),
     });
     const savedGroup = await newGroup.save();
@@ -53,14 +62,15 @@ export const createGroup = async (req, res) => {
 export const updateGroup = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
+
+    const { name, description } = req.body;
     if (!name) {
       return res.status(400).json({ message: "Group name is required" });
     }
     const updatedGroup = await Group.findByIdAndUpdate(
       id,
-      { name ,...updatedBy(req),},
-      
+      { name, description, ...updatedBy(req) },
+
       { new: true, runValidators: true }
     );
     if (!updatedGroup) {
@@ -79,10 +89,11 @@ export const deleteGroup = async (req, res) => {
   try {
     const { id } = req.params;
     const deleteGroup = await Group.findByIdAndDelete(id);
+    // console.log("deleteGroup:", deleteGroup);
     if (!deleteGroup) {
       return res.status(404).json({ message: "Group not found" });
     }
-    res.status(204).json({ message: "Group deleted successfully" });
+    res.status(200).json({ message: "Group deleted successfully" });
   } catch (error) {
     res
       .status(500)

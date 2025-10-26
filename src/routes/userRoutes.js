@@ -1,33 +1,17 @@
 import express from "express";
-import { loginUser, registerUser } from "../controllers/userController.js";
+import {
+  deleteUser,
+  getAllUsers,
+  loginUser,
+  logoutUser,
+  registerUser,
+  updateUser,
+} from "../controllers/userController.js";
 import auth from "../middleware/auth.js";
+import authorizeRoles from "../middleware/authorizeRoles.js";
 
 const router = express.Router();
 
-// @desc    Register a new user
-// @route   POST /api/users/register
-// @access  only admins
-
-router.post("/register", auth, (req, res, next) => {
-  // check role
-  if (req.user.role !== "admin" && req.user.role !== "sysadmin") {
-    return res
-      .status(403)
-      .json({ message: "access denied, only admins can register new users" });
-  }
-  // if authorized, proceed to controller
-  registerUser(req, res, next);
-});
-
-// @desc    Login user and get token
-// @route   POST /api/users/login
-// @access  Public
-router.post("/login", loginUser);
-
-// @desc    Get current user
-// @route   GET /api/users/me
-// @access  Private
-// 🔒 Protected route: Get current user (requires valid JWT)
 router.get("/me", auth, (req, res) => {
   res.json({
     _id: req.user._id,
@@ -36,5 +20,18 @@ router.get("/me", auth, (req, res) => {
     role: req.user.role,
   });
 });
+router.get("/", auth, authorizeRoles("admin", "sysadmin"), getAllUsers);
 
+router.post(
+  "/",
+  auth,
+  authorizeRoles("admin", "sysadmin"),
+  registerUser
+);
+
+router.post("/login", loginUser);
+router.patch("/:id", auth, authorizeRoles("admin", "sysadmin"), updateUser);
+router.post("/logout", logoutUser);
+
+router.delete("/:id", auth, authorizeRoles("admin", "sysadmin"), deleteUser);
 export default router;

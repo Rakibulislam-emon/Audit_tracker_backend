@@ -2,7 +2,6 @@ import express from "express";
 
 const router = express.Router();
 
-import auth from "../middleware/auth.js";
 import approvalRoutes from "./approvalRoutes.js";
 import auditSessionRoutes from "./auditSessionRoutes.js";
 import checkTypeRoutes from "./checkTypeRoutes.js";
@@ -24,33 +23,29 @@ import teamRoutes from "./teamRoutes.js";
 import templateRoutes from "./templateRoutes.js";
 import userRoutes from "./userRoutes.js";
 
-
-
 router.use("/api/users", userRoutes);
-router.use("/api/groups", auth, groupRoutes);
-router.use("/api/companies", auth, companyRoutes);
-router.use("/api/sites", auth, siteRoutes);
-router.use("/api/check-types", auth, checkTypeRoutes);
-router.use("/api/rules", auth, ruleRoutes);
-router.use("/api/templates", auth, templateRoutes);
-router.use("/api/questions", auth, questionRoutes);
-router.use("/api/programs", auth, programRoutes);
-router.use("/api/schedules", auth, scheduleRoutes);
-router.use("/api/audit-sessions", auth, auditSessionRoutes);
-router.use("/api/teams", auth, teamRoutes);
-router.use("/api/observations", auth, observationRoutes);
-router.use("/api/problems", auth, problemRoutes);
+router.use("/api/groups", groupRoutes);
+router.use("/api/companies", companyRoutes);
+router.use("/api/sites", siteRoutes);
+router.use("/api/checkTypes", checkTypeRoutes);
+router.use("/api/rules", ruleRoutes);
+router.use("/api/templates", templateRoutes);
+router.use("/api/questions", questionRoutes);
+router.use("/api/programs", programRoutes);
+router.use("/api/schedules", scheduleRoutes);
+router.use("/api/auditSessions", auditSessionRoutes);
+router.use("/api/teams", teamRoutes);
+router.use("/api/observations", observationRoutes);
+router.use("/api/problems", problemRoutes);
 router.use("/api/fix-actions", fixAction);
 
+router.use("/api/proofs", proofRoutes);
 
+router.use("/api/reports", reportRoutes);
 
-router.use("/api/proofs", auth, proofRoutes);
+router.use("/api/approvals", approvalRoutes);
 
-router.use("/api/reports", auth, reportRoutes);
+router.use("/api/metrics", metricRoutes);
 
-router.use("/api/approvals", auth, approvalRoutes);
-
-router.use("/api/metrics", auth, metricRoutes);
-
-router.use("/api/question-rule-links", auth, questionRuleLinkRoutes);
+router.use("/api/question-rule-links", questionRuleLinkRoutes);
 export default router;

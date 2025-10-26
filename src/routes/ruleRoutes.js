@@ -1,14 +1,16 @@
-// // src/routes/ruleRoutes.js
+// src/routes/ruleRoutes.js
 
-// import { Router } from "express";
-// import * as ruleController from "../controllers/ruleController.js";
+import { Router } from "express";
+import * as ruleController from "../controllers/ruleController.js";
+import auth from "../middleware/auth.js";
+import authorizeRoles from "../middleware/authorizeRoles.js";
 
-// const router = Router();
+const router = Router();
 
-// router.get("/", ruleController.getAllRules);
-// router.get("/:id", ruleController.getRuleById);
-// router.post("/", ruleController.createRule);
-// router.put("/:id", ruleController.updateRule);
-// router.delete("/:id", ruleController.deleteRule);
+router.get("/", auth, authorizeRoles("admin"), ruleController.getAllRules);
+router.get("/:id", auth, authorizeRoles("admin"), ruleController.getRuleById);
+router.post("/", auth, authorizeRoles("admin"), ruleController.createRule);
+router.put("/:id", auth, authorizeRoles("admin"), ruleController.updateRule);
+router.delete("/:id", auth, authorizeRoles("admin"), ruleController.deleteRule);
 
-// export default router;
+export default router;

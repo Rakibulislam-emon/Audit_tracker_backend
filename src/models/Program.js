@@ -13,6 +13,13 @@ const programSchema = new mongoose.Schema(
     description: String,
     startDate: Date,
     endDate: Date,
+    // relation
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+      required: true,
+    },
+
     programStatus: {
       type: String,
       enum: ["planning", "in-progress", "completed", "on-hold", "cancelled"],

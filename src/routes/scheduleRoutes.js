@@ -1,12 +1,40 @@
+// src/routes/scheduleRoutes.js
 import { Router } from "express";
 import * as scheduleController from "../controllers/scheduleController.js";
+import auth from "../middleware/auth.js";
+import authorizeRoles from "../middleware/authorizeRoles.js";
 
 const router = Router();
 
-router.get("/", scheduleController.getAllSchedules);
-router.get("/:id", scheduleController.getScheduleById);
-router.post("/", scheduleController.createSchedule);
-router.put("/:id", scheduleController.updateSchedule);
-router.delete("/:id", scheduleController.deleteSchedule);
+router.get(
+  "/",
+  auth,
+  authorizeRoles("admin", "sysadmin", "audit_manager", "auditor"),
+  scheduleController.getAllSchedules
+);
+router.get(
+  "/:id",
+  auth,
+  authorizeRoles("admin", "sysadmin", "audit_manager", "auditor"),
+  scheduleController.getScheduleById
+);
+router.post(
+  "/",
+  auth,
+  authorizeRoles("admin", "sysadmin", "audit_manager"),
+  scheduleController.createSchedule
+);
+router.patch(
+  "/:id",
+  auth,
+  authorizeRoles("admin", "sysadmin", "audit_manager"),
+  scheduleController.updateSchedule
+);
+router.delete(
+  "/:id",
+  auth,
+  authorizeRoles("admin", "sysadmin"),
+  scheduleController.deleteSchedule
+);
 
 export default router;

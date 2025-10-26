@@ -11,7 +11,11 @@ const siteSchema = new mongoose.Schema({
     required: true, 
     trim: true 
   },
-  location: String,
+  location: {
+    type: String, 
+    required: true, 
+    trim: true
+  },
   company: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Company', 
