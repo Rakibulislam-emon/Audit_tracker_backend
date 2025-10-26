@@ -19,7 +19,7 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: "http://localhost:3000", // your frontend origin
+    origin: ["http://localhost:3000","https://audit-management-chi.vercel.app"], // your frontend origin
     credentials: true, // allow cookies to be sent
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE,"],
     allowedHeaders: ["Content-Type", "Authorization"],
