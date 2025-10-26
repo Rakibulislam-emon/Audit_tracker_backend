@@ -1,9 +1,9 @@
 import cookieParser from "cookie-parser";
+import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import config from "./config/config.js";
 import connectDB from "./config/db.js";
-import cors from "cors";
 // import path from 'path';
 
 // Import routes
@@ -19,9 +19,19 @@ app.use(cookieParser());
 
 app.use(
   cors({
-    origin: ["http://localhost:3000","https://audit-management-chi.vercel.app"], // your frontend origin
-    credentials: true, // allow cookies to be sent
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE,"],
+    origin: function (origin, callback) {
+      const allowedOrigins = [
+        "http://localhost:3000",
+        "https://audit-management-chi.vercel.app",
+      ];
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
