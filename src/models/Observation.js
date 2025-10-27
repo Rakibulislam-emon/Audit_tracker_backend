@@ -1,6 +1,6 @@
 // src/models/Observation.js
 import mongoose from "mongoose";
-import commonFields from "./commonFields.js"; 
+import commonFields from "./commonFields.js";
 
 const observationSchema = new mongoose.Schema(
   {

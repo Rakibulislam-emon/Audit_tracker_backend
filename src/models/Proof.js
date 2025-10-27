@@ -1,92 +1,76 @@
-// import mongoose from 'mongoose';
-// import commonFields from './commonFields.js';
-
-// const proofSchema = new mongoose.Schema({
-//   problem: {
-//     type: mongoose.Schema.Types.ObjectId,
-//     ref: 'Problem',
-//     required: true
-//   },
-//   fileType: {
-//     type: String,
-//     enum: ['image', 'document', 'video', 'audio', 'other'],
-//     required: true
-//   },
-//   originalName: {
-//     type: String,
-//     required: true
-//   },
-//   // Cloudinary fields
-//   cloudinaryId: {  // Cloudinary-এর public_id
-//     type: String,
-//     required: true
-//   },
-//   cloudinaryUrl: {  // Cloudinary-এর secure URL
-//     type: String,
-//     required: true
-//   },
-//   cloudinaryFormat: {  // File format (jpg, pdf, mp4, etc.)
-//     type: String
-//   },
-//   cloudinaryResourceType: {  // image, video, raw (for documents)
-//     type: String
-//   },
-//   // Additional Cloudinary info
-//   width: Number,  // For images/videos
-//   height: Number, // For images/videos
-//   duration: Number, // For videos/audio
-//   size: {
-//     type: Number,
-//     required: true
-//   },
-//   caption: String,
-//   version: {
-//     type: Number,
-//     default: 1
-//   },
-//   uploadedAt: {
-//     type: Date,
-//     default: Date.now
-//   },
-//   ...commonFields
-// }, {
-//   timestamps: true
-// });
-
-// export default mongoose.models.Proof || mongoose.model('Proof', proofSchema);
-
+// src/models/Proof.js
 import mongoose from "mongoose";
 import commonFields from "./commonFields.js";
 
 const proofSchema = new mongoose.Schema(
   {
+    // ✅ Relation Fields (Allow linking to one of these)
     problem: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Problem",
-      required: true,
+      required: false, // Not always required if linked to Obs/FixAction
     },
+    observation: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Observation",
+      required: false,
+    },
+    fixAction: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "FixAction",
+      required: false,
+    },
+    // Validation needed in controller to ensure at least one link exists
+
+    // --- File Details ---
     fileType: {
+      // Determined from Cloudinary resource_type/mime
       type: String,
-      enum: ["image", "document", "video", "audio", "other"],
+      enum: {
+        values: ["image", "document", "video", "audio", "other"],
+        message: "{VALUE} is not a valid file type.",
+      },
       required: true,
     },
-    originalName: { type: String, required: true },
-    cloudinaryId: { type: String, required: true },
-    cloudinaryUrl: { type: String, required: true },
-    cloudinaryFormat: String,
-    cloudinaryResourceType: { type: String, required: true },
-    width: Number,
-    height: Number,
-    duration: Number,
-    size: { type: Number, required: true },
-    caption: String,
-    version: { type: Number, default: 1 },
+    originalName: {
+      // Original filename from upload
+      type: String,
+      required: [true, "Original filename is required."],
+      trim: true,
+    },
+    caption: {
+      // Optional user-provided caption/description
+      type: String,
+      trim: true,
+    },
+
+    // --- Cloudinary Details ---
+    cloudinaryId: { type: String, required: true }, // Public ID
+    cloudinaryUrl: { type: String, required: true }, // Secure URL
+    cloudinaryFormat: String, // File extension (e.g., pdf, jpg)
+    cloudinaryResourceType: { type: String, required: true }, // image, video, raw
+
+    // --- File Metadata ---
+    size: { type: Number, required: [true, "File size is required."] }, // In bytes
+    width: Number, // For images/videos
+    height: Number, // For images/videos
+    duration: Number, // For videos/audio
+
+    // --- Versioning & Upload Time ---
+    version: { type: Number, default: 1 }, // Simple version counter (optional use)
     uploadedAt: { type: Date, default: Date.now },
-    ...commonFields, // ✅ একবারই ব্যবহার করুন
+
+    // --- Common Fields ---
+    ...commonFields, // status, createdBy, updatedBy
   },
   {
-    timestamps: true, // ✅ timestamps সঠিক যায়গায়
+    timestamps: true, // createdAt, updatedAt
   }
 );
+
+// Index for faster lookup by related entity
+proofSchema.index({ problem: 1 });
+proofSchema.index({ observation: 1 });
+proofSchema.index({ fixAction: 1 });
 
 export default mongoose.models.Proof || mongoose.model("Proof", proofSchema);
