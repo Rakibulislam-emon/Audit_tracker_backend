@@ -1,7 +1,51 @@
+// src/controllers/approvalController.js
+
 import Approval from "../models/Approval.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
 
-// ১. Get all approvals with filtering
+// Helper function to update entity status after approval
+// (Note: This uses dynamic imports, ensure models are correctly referenced)
+const updateEntityStatus = async (entityType, entityId, status) => {
+  try {
+    let Model;
+    // Map string from enum to actual Model
+    switch (entityType) {
+      case "Report":
+        Model = (await import("../models/Report.js")).default;
+        break;
+      case "Problem":
+        Model = (await import("../models/Problem.js")).default;
+        break;
+      case "FixAction":
+        Model = (await import("../models/FixAction.js")).default;
+        break;
+      case "AuditSession":
+        Model = (await import("../models/AuditSession.js")).default;
+        break;
+      case "Template":
+        Model = (await import("../models/Template.js")).default;
+        break;
+      case "Schedule":
+        Model = (await import("../models/Schedule.js")).default;
+        break;
+      default:
+        console.warn(
+          `[Helper] No model mapping found for entity type: ${entityType}`
+        );
+        return;
+    }
+    // Update the common 'status' field (active/inactive)
+    await Model.findByIdAndUpdate(entityId, { status: status });
+    console.log(
+      `[Helper] Updated ${entityType} ${entityId} system status to: ${status}`
+    );
+  } catch (error) {
+    console.error("[Helper] Error updating entity status:", error);
+    // Do not throw, as this is a side-effect
+  }
+};
+
+// ১. Get all approvals with filtering (✅ Updated for standard response, search)
 export const getAllApprovals = async (req, res) => {
   try {
     const {
@@ -12,9 +56,9 @@ export const getAllApprovals = async (req, res) => {
       requestedBy,
       page = 1,
       limit = 10,
+      search, // Added search
     } = req.query;
 
-    // Build filter object
     const filter = {};
     if (approvalStatus) filter.approvalStatus = approvalStatus;
     if (priority) filter.priority = priority;
@@ -22,34 +66,56 @@ export const getAllApprovals = async (req, res) => {
     if (approver) filter.approver = approver;
     if (requestedBy) filter.requestedBy = requestedBy;
 
+    // Add search filter (for title and description)
+    if (search) {
+      const searchRegex = { $regex: search, $options: "i" };
+      filter.$or = [{ title: searchRegex }, { description: searchRegex }];
+    }
+
+    const options = {
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+      sort: { createdAt: -1 },
+      populate: [
+        { path: "entityId", select: "title name questionText actionText" },
+        { path: "approver", select: "name email role" },
+        { path: "requestedBy", select: "name email" },
+        { path: "decision.decisionBy", select: "name email" },
+        { path: "decision.escalatedTo", select: "name email" },
+        { path: "createdBy", select: "name email" },
+        { path: "updatedBy", select: "name email" }, // ✅ Added updatedBy
+      ],
+    };
+
     const approvals = await Approval.find(filter)
-      .populate("entityId", "title name") // Different entities have different fields
-      .populate("approver", "name email role")
-      .populate("requestedBy", "name email")
-      .populate("decision.decisionBy", "name email")
-      .populate("decision.escalatedTo", "name email")
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .populate(options.populate)
+      .sort(options.sort)
+      .limit(options.limit)
+      .skip((options.page - 1) * options.limit);
 
     const total = await Approval.countDocuments(filter);
 
     res.status(200).json({
-      approvals,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        totalItems: total,
-        itemsPerPage: limit,
-      },
+      data: approvals, // ✅ Standard 'data' key
+      count: total, // ✅ Standard 'count' key
       message: "Approvals retrieved successfully",
+      success: true, // ✅ Added success flag
+      pagination: {
+        // Keep pagination info
+        currentPage: options.page,
+        totalPages: Math.ceil(total / options.limit),
+        totalItems: total,
+      },
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("[getAllApprovals] Error:", error);
+    res
+      .status(500)
+      .json({ message: "Server error", error: error.message, success: false });
   }
 };
 
-// ২. Get approval by ID
+// ২. Get approval by ID (✅ Standard Response, updatedBy population)
 export const getApprovalById = async (req, res) => {
   try {
     const approval = await Approval.findById(req.params.id)
@@ -59,22 +125,30 @@ export const getApprovalById = async (req, res) => {
       .populate("decision.decisionBy", "name email")
       .populate("decision.escalatedTo", "name email")
       .populate("requirements.completedBy", "name email")
-      .populate("reviewHistory.reviewedBy", "name email");
+      .populate("reviewHistory.reviewedBy", "name email")
+      .populate("createdBy", "name email")
+      .populate("updatedBy", "name email"); // ✅ Added updatedBy
 
     if (!approval) {
-      return res.status(404).json({ message: "Approval not found" });
+      return res
+        .status(404)
+        .json({ message: "Approval not found", success: false });
     }
 
     res.status(200).json({
-      approval,
+      data: approval, // ✅ Standard 'data' key
       message: "Approval retrieved successfully",
+      success: true,
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("[getApprovalById] Error:", error);
+    res
+      .status(500)
+      .json({ message: "Server error", error: error.message, success: false });
   }
 };
 
-// ৩. Create new approval request
+// ৩. Create new approval request (✅ Standard Response, validation, helper fix)
 export const createApproval = async (req, res) => {
   try {
     const {
@@ -88,24 +162,23 @@ export const createApproval = async (req, res) => {
       requirements,
     } = req.body;
 
-    // Validation
     if (!entityType || !entityId || !title || !description || !approver) {
       return res.status(400).json({
         message:
           "Entity type, entity ID, title, description, and approver are required",
+        success: false,
       });
     }
 
-    // Check if approval already exists for this entity
     const existingApproval = await Approval.findOne({
       entityType,
       entityId,
       approvalStatus: { $in: ["pending", "in-review"] },
     });
-
     if (existingApproval) {
       return res.status(400).json({
-        message: "Pending approval already exists for this entity",
+        message: "A pending approval request already exists for this item.",
+        success: false,
       });
     }
 
@@ -116,110 +189,144 @@ export const createApproval = async (req, res) => {
       description,
       priority: priority || "medium",
       approver,
-      requestedBy: req.user?.id || req.body.requestedBy,
+      requestedBy: req.user?.id, // Use logged in user
       timeline: {
         requestedAt: new Date(),
         deadline: deadline ? new Date(deadline) : null,
       },
       requirements: requirements || [],
-      ...createdBy(req),
+      ...createdBy(req), // ✅ Use common helper
+      status: "active", // Default to active
     });
 
     // Add initial review history
     newApproval.reviewHistory.push({
-      reviewedBy: req.user?.id || req.body.requestedBy,
+      reviewedBy: req.user?.id,
       action: "submitted",
       comments: "Approval request submitted",
+      reviewedAt: new Date(), // ✅ Added timestamp
     });
 
-    const savedApproval = await newApproval.save();
+    let savedApproval = await newApproval.save();
+
+    // Populate for response
+    savedApproval = await Approval.findById(savedApproval._id)
+      .populate("entityId", "title name questionText actionText")
+      .populate("approver", "name email")
+      .populate("requestedBy", "name email")
+      .populate("createdBy", "name email");
 
     // TODO: Send notification to approver
 
     res.status(201).json({
-      savedApproval,
+      data: savedApproval, // ✅ Standard 'data' key
       message: "Approval request created successfully",
+      success: true,
     });
   } catch (error) {
-    res.status(400).json({ message: "Error creating approval request" });
+    console.error("[createApproval] Error:", error);
+    if (error.name === "ValidationError")
+      return res
+        .status(400)
+        .json({ message: error.message, error: error.errors, success: false });
+    res.status(400).json({
+      message: "Error creating approval request",
+      error: error.message,
+      success: false,
+    });
   }
 };
 
-// ৪. Update approval (basic info)
+// ৪. Update approval (basic info) (✅ Standard Response, validation, helper fix)
 export const updateApproval = async (req, res) => {
   try {
-    const { title, description, priority, deadline } = req.body;
-
+    const { title, description, priority, deadline, status, requirements } =
+      req.body;
     const approvalId = req.params.id;
 
-    const updateData = {
-      title,
-      description,
-      priority,
-      ...updatedBy(req),
-    };
+    const updateData = { ...updatedBy(req) }; // ✅ Use common helper
+    if (title) updateData.title = title;
+    if (description) updateData.description = description;
+    if (priority) updateData.priority = priority;
+    if (status === "active" || status === "inactive")
+      updateData.status = status;
+    if (deadline) updateData["timeline.deadline"] = new Date(deadline);
+    if (requirements) updateData.requirements = requirements;
 
-    if (deadline) {
-      updateData["timeline.deadline"] = new Date(deadline);
+    const approval = await Approval.findById(approvalId);
+    if (!approval) {
+      return res
+        .status(404)
+        .json({ message: "Approval not found", success: false });
     }
 
-    const updatedApproval = await Approval.findByIdAndUpdate(
-      approvalId,
-      updateData,
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedApproval) {
-      return res.status(404).json({ message: "Approval not found" });
-    }
-
-    // Add to review history
-    await updatedApproval.addReviewHistory({
+    // ✅ Manually add to review history
+    approval.reviewHistory.push({
       reviewedBy: req.user?.id,
-      action: "updated",
-      comments: "Approval request updated",
+      action: "updated", // Custom action type
+      comments: "Approval request basic details updated",
+      reviewedAt: new Date(),
     });
+
+    // Apply updates
+    Object.assign(approval, updateData);
+    const updatedApproval = await approval.save({
+      new: true,
+      runValidators: true,
+    });
+
+    // Repopulate
+    const populatedApproval = await Approval.findById(
+      updatedApproval._id
+    ).populate("approver requestedBy createdBy updatedBy entityId");
 
     res.status(200).json({
-      updatedApproval,
+      data: populatedApproval, // ✅ Standard 'data' key
       message: "Approval updated successfully",
+      success: true,
     });
   } catch (error) {
-    res.status(400).json({ message: "Error updating approval" });
+    console.error("[updateApproval] Error:", error);
+    if (error.name === "ValidationError")
+      return res
+        .status(400)
+        .json({ message: error.message, error: error.errors, success: false });
+    res.status(400).json({
+      message: "Error updating approval",
+      error: error.message,
+      success: false,
+    });
   }
 };
 
-// ৫. Approve an approval request
+// ৫. Approve an approval request (✅ Standard Response, validation, helper fix)
 export const approveRequest = async (req, res) => {
   try {
     const { comments } = req.body;
     const approvalId = req.params.id;
-    console.log('approvalId:', approvalId)
     const userId = req.user?.id;
-    console.log('userId:', userId)
 
     const approval = await Approval.findById(approvalId);
-    console.log('approval:', approval)
+    if (!approval)
+      return res
+        .status(404)
+        .json({ message: "Approval not found", success: false });
 
-    if (!approval) {
-      return res.status(404).json({ message: "Approval not found" });
-    }
-
-    // Check if user is the approver
     if (approval.approver.toString() !== userId?.toString()) {
       return res.status(403).json({
         message: "You are not authorized to approve this request",
+        success: false,
       });
     }
 
-    // Check if all requirements are met
     const unmetRequirements = approval.requirements.filter(
       (req) => !req.completed
     );
     if (unmetRequirements.length > 0) {
       return res.status(400).json({
-        message: "Cannot approve - some requirements are not completed",
-        unmetRequirements: unmetRequirements.map((req) => req.description),
+        message: "Cannot approve - requirements not completed",
+        unmetRequirements,
+        success: false,
       });
     }
 
@@ -232,51 +339,70 @@ export const approveRequest = async (req, res) => {
     };
     approval.timeline.respondedAt = new Date();
 
-    // Add to review history
-    await approval.addReviewHistory({
+    // ✅ Manually add to review history
+    approval.reviewHistory.push({
       reviewedBy: userId,
       action: "approved",
       comments: comments || "Request approved",
+      reviewedAt: new Date(),
     });
 
-    const savedApproval = await approval.save();
+    let savedApproval = await approval.save();
 
-    // Update the entity status to "active" after approval
+    // Update the related entity's system status to "active"
     await updateEntityStatus(approval.entityType, approval.entityId, "active");
 
-    // TODO: Send notification to requester
+    // Repopulate
+    savedApproval = await Approval.findById(savedApproval._id)
+      .populate("entityId", "title name questionText actionText")
+      .populate("approver", "name email")
+      .populate("requestedBy", "name email")
+      .populate("createdBy", "name email")
+      .populate("updatedBy", "name email");
 
     res.status(200).json({
-      approval: savedApproval,
+      data: savedApproval, // ✅ Standard 'data' key
       message: "Approval request approved successfully",
+      success: true,
     });
   } catch (error) {
-    res.status(400).json({ message: "Error approving request" });
+    console.error("[approveRequest] Error:", error);
+    if (error.name === "ValidationError")
+      return res
+        .status(400)
+        .json({ message: error.message, error: error.errors, success: false });
+    res.status(400).json({
+      message: "Error approving request",
+      error: error.message,
+      success: false,
+    });
   }
 };
 
-// ৬. Reject an approval request
+// ৬. Reject an approval request (✅ Standard Response, validation, helper fix)
 export const rejectRequest = async (req, res) => {
   try {
-    const { comments, reason } = req.body;
+    const { comments } = req.body; // 'reason' was in your req, but only 'comments' seems used
     const approvalId = req.params.id;
     const userId = req.user?.id;
 
     if (!comments) {
       return res.status(400).json({
         message: "Comments are required when rejecting a request",
+        success: false,
       });
     }
 
     const approval = await Approval.findById(approvalId);
-
-    if (!approval) {
-      return res.status(404).json({ message: "Approval not found" });
-    }
+    if (!approval)
+      return res
+        .status(404)
+        .json({ message: "Approval not found", success: false });
 
     if (approval.approver.toString() !== userId?.toString()) {
       return res.status(403).json({
         message: "You are not authorized to reject this request",
+        success: false,
       });
     }
 
@@ -289,31 +415,51 @@ export const rejectRequest = async (req, res) => {
     };
     approval.timeline.respondedAt = new Date();
 
-    await approval.addReviewHistory({
+    // ✅ Manually add to review history
+    approval.reviewHistory.push({
       reviewedBy: userId,
       action: "rejected",
       comments: comments,
+      reviewedAt: new Date(),
     });
 
-    const savedApproval = await approval.save();
+    let savedApproval = await approval.save();
 
-    // Update the entity status to "inactive" after rejection
+    // Update the related entity's system status to "inactive"
     await updateEntityStatus(
       approval.entityType,
       approval.entityId,
       "inactive"
     );
 
+    // Repopulate
+    savedApproval = await Approval.findById(savedApproval._id)
+      .populate("entityId", "title name questionText actionText")
+      .populate("approver", "name email")
+      .populate("requestedBy", "name email")
+      .populate("createdBy", "name email")
+      .populate("updatedBy", "name email");
+
     res.status(200).json({
-      approval: savedApproval,
+      data: savedApproval, // ✅ Standard 'data' key
       message: "Approval request rejected",
+      success: true,
     });
   } catch (error) {
-    res.status(400).json({ message: "Error rejecting request" });
+    console.error("[rejectRequest] Error:", error);
+    if (error.name === "ValidationError")
+      return res
+        .status(400)
+        .json({ message: error.message, error: error.errors, success: false });
+    res.status(400).json({
+      message: "Error rejecting request",
+      error: error.message,
+      success: false,
+    });
   }
 };
 
-// ৭. Escalate approval request
+// ৭. Escalate approval request (✅ Standard Response, validation, helper fix)
 export const escalateRequest = async (req, res) => {
   try {
     const { escalatedTo, reason, comments } = req.body;
@@ -323,18 +469,20 @@ export const escalateRequest = async (req, res) => {
     if (!escalatedTo || !reason) {
       return res.status(400).json({
         message: "Escalated to user and reason are required",
+        success: false,
       });
     }
 
     const approval = await Approval.findById(approvalId);
-
-    if (!approval) {
-      return res.status(404).json({ message: "Approval not found" });
-    }
+    if (!approval)
+      return res
+        .status(404)
+        .json({ message: "Approval not found", success: false });
 
     if (approval.approver.toString() !== userId?.toString()) {
       return res.status(403).json({
         message: "You are not authorized to escalate this request",
+        success: false,
       });
     }
 
@@ -347,57 +495,86 @@ export const escalateRequest = async (req, res) => {
       escalatedTo: escalatedTo,
       comments: comments,
     };
+    approval.approver = escalatedTo; // Update approver to the new user
 
-    // Update approver to the escalated user
-    approval.approver = escalatedTo;
-
-    await approval.addReviewHistory({
+    // ✅ Manually add to review history
+    approval.reviewHistory.push({
       reviewedBy: userId,
       action: "escalated",
-      comments: `Escalated to another approver. Reason: ${reason}`,
+      comments: `Escalated to new approver. Reason: ${reason}. ${
+        comments || ""
+      }`.trim(),
+      reviewedAt: new Date(),
     });
 
-    const savedApproval = await approval.save();
+    let savedApproval = await approval.save();
+
+    // Repopulate
+    savedApproval = await Approval.findById(savedApproval._id)
+      .populate("entityId", "title name questionText actionText")
+      .populate("approver", "name email")
+      .populate("requestedBy", "name email")
+      .populate("createdBy", "name email")
+      .populate("updatedBy", "name email");
 
     // TODO: Send notification to new approver
 
     res.status(200).json({
-      approval: savedApproval,
+      data: savedApproval, // ✅ Standard 'data' key
       message: "Approval request escalated successfully",
+      success: true,
     });
   } catch (error) {
-    res.status(400).json({ message: "Error escalating request" });
+    console.error("[escalateRequest] Error:", error);
+    if (error.name === "ValidationError")
+      return res
+        .status(400)
+        .json({ message: error.message, error: error.errors, success: false });
+    res.status(400).json({
+      message: "Error escalating request",
+      error: error.message,
+      success: false,
+    });
   }
 };
 
-// ৮. Get approvals for current user (approver)
+// ৮. Get approvals for current user (approver) (✅ Standard Response)
 export const getMyApprovals = async (req, res) => {
   try {
     const userId = req.user?.id;
     const { approvalStatus } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ message: "User ID not found" });
+      return res
+        .status(400)
+        .json({ message: "User ID not found", success: false });
     }
 
     const filter = { approver: userId };
     if (approvalStatus) filter.approvalStatus = approvalStatus;
 
     const approvals = await Approval.find(filter)
-      .populate("entityId", "title name")
+      .populate("entityId", "title name questionText actionText")
       .populate("requestedBy", "name email")
       .sort({ createdAt: -1 });
 
+    const total = await Approval.countDocuments(filter);
+
     res.status(200).json({
-      approvals,
+      data: approvals, // ✅ Standard 'data' key
+      count: total, // ✅ Added count
       message: "Your approval requests retrieved successfully",
+      success: true,
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("[getMyApprovals] Error:", error);
+    res
+      .status(500)
+      .json({ message: "Server error", error: error.message, success: false });
   }
 };
 
-// ৯. Update requirement status
+// ৯. Update requirement status (✅ Standard Response, validation, helper fix)
 export const updateRequirement = async (req, res) => {
   try {
     const { requirementIndex, completed } = req.body;
@@ -405,13 +582,19 @@ export const updateRequirement = async (req, res) => {
     const userId = req.user?.id;
 
     const approval = await Approval.findById(approvalId);
+    if (!approval)
+      return res
+        .status(404)
+        .json({ message: "Approval not found", success: false });
 
-    if (!approval) {
-      return res.status(404).json({ message: "Approval not found" });
-    }
-
-    if (requirementIndex >= approval.requirements.length) {
-      return res.status(400).json({ message: "Invalid requirement index" });
+    if (
+      requirementIndex === undefined ||
+      requirementIndex < 0 ||
+      requirementIndex >= approval.requirements.length
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Invalid requirement index", success: false });
     }
 
     approval.requirements[requirementIndex].completed = completed;
@@ -422,26 +605,38 @@ export const updateRequirement = async (req, res) => {
       ? userId
       : null;
 
-    await approval.addReviewHistory({
+    // ✅ Manually add to review history
+    approval.reviewHistory.push({
       reviewedBy: userId,
-      action: "updated",
+      action: "updated", // Custom action
       comments: `Requirement "${
         approval.requirements[requirementIndex].description
-      }" marked as ${completed ? "completed" : "incomplete"}`,
+      }" marked as ${completed ? "completed" : "incomplete"}.`,
+      reviewedAt: new Date(),
     });
 
     const savedApproval = await approval.save();
 
     res.status(200).json({
-      approval: savedApproval,
+      data: savedApproval, // ✅ Standard 'data' key
       message: "Requirement updated successfully",
+      success: true,
     });
   } catch (error) {
-    res.status(400).json({ message: "Error updating requirement" });
+    console.error("[updateRequirement] Error:", error);
+    if (error.name === "ValidationError")
+      return res
+        .status(400)
+        .json({ message: error.message, error: error.errors, success: false });
+    res.status(400).json({
+      message: "Error updating requirement",
+      error: error.message,
+      success: false,
+    });
   }
 };
 
-// ১০. Add comment to approval
+// ১০. Add comment to approval (✅ Standard Response, validation, helper fix)
 export const addComment = async (req, res) => {
   try {
     const { comments } = req.body;
@@ -449,67 +644,42 @@ export const addComment = async (req, res) => {
     const userId = req.user?.id;
 
     if (!comments) {
-      return res.status(400).json({ message: "Comments are required" });
+      return res
+        .status(400)
+        .json({ message: "Comments are required", success: false });
     }
 
     const approval = await Approval.findById(approvalId);
+    if (!approval)
+      return res
+        .status(404)
+        .json({ message: "Approval not found", success: false });
 
-    if (!approval) {
-      return res.status(404).json({ message: "Approval not found" });
-    }
-
-    await approval.addReviewHistory({
+    // ✅ Manually add to review history
+    approval.reviewHistory.push({
       reviewedBy: userId,
       action: "commented",
       comments: comments,
+      reviewedAt: new Date(),
     });
 
     const savedApproval = await approval.save();
 
     res.status(200).json({
-      approval: savedApproval,
+      data: savedApproval, // ✅ Standard 'data' key
       message: "Comment added successfully",
+      success: true,
     });
   } catch (error) {
-    res.status(400).json({ message: "Error adding comment" });
-  }
-};
-
-// Helper function to update entity status after approval
-const updateEntityStatus = async (entityType, entityId, status) => {
-  try {
-    let Model;
-    let updateData = { status: status }; // 'active' or 'inactive'
-
-    switch (entityType) {
-      case "Report":
-        Model = (await import("./Report.js")).default;
-        break;
-      case "Problem":
-        Model = (await import("./Problem.js")).default;
-        break;
-      case "FixAction":
-        Model = (await import("./FixAction.js")).default;
-        break;
-      case "AuditSession":
-        Model = (await import("./AuditSession.js")).default;
-        break;
-      case "Template":
-        Model = (await import("./Template.js")).default;
-        break;
-      case "Schedule":
-        Model = (await import("./Schedule.js")).default;
-        break;
-      default:
-        console.log(`No model defined for entity type: ${entityType}`);
-        return;
-    }
-
-    if (Model) {
-      await Model.findByIdAndUpdate(entityId, updateData);
-      console.log(`Updated ${entityType} ${entityId} status to: ${status}`);
-    }
-  } catch (error) {
-    console.error("Error updating entity status:", error);
+    console.error("[addComment] Error:", error);
+    if (error.name === "ValidationError")
+      return res
+        .status(400)
+        .json({ message: error.message, error: error.errors, success: false });
+    res.status(400).json({
+      message: "Error adding comment",
+      error: error.message,
+      success: false,
+    });
   }
 };
