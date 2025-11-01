@@ -517,8 +517,6 @@ export const escalateRequest = async (req, res) => {
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
-    // TODO: Send notification to new approver
-
     res.status(200).json({
       data: savedApproval, // ✅ Standard 'data' key
       message: "Approval request escalated successfully",
@@ -636,7 +634,7 @@ export const updateRequirement = async (req, res) => {
   }
 };
 
-// ১০. Add comment to approval (✅ Standard Response, validation, helper fix)
+// ۱۰. Add comment to approval (✅ Standard Response, validation, helper fix)
 export const addComment = async (req, res) => {
   try {
     const { comments } = req.body;
