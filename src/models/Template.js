@@ -1,10 +1,12 @@
+// src/models/Template.js
+
 import mongoose from "mongoose";
 import commonFields from "./commonFields.js";
 
 const templateSchema = new mongoose.Schema({
   title: { 
     type: String, 
-    required: true, 
+    required: [true, 'Template Title is required.'], 
     trim: true 
   },
   description: String,
@@ -15,11 +17,25 @@ const templateSchema = new mongoose.Schema({
   company: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Company', 
-    required: true 
+    required: [true, 'Company is required.']
   },
-  ...commonFields
+  
+ 
+  // ✅ ADDED: Array of Questions (as per audit_next.pdf )
+  // This makes the Template a "Collection of Questions"
+  questions: [{ 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Question' 
+  }],
+
+  // --- CHANGES END HERE ---
+
+  ...commonFields // status, createdBy, updatedBy
 }, {
   timestamps: true
 });
+
+// Index for faster query by company and checkType
+templateSchema.index({ company: 1, checkType: 1 });
 
 export default mongoose.models.Template || mongoose.model('Template', templateSchema);

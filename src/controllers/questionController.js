@@ -3,44 +3,48 @@
 import Question from '../models/Question.js';
 import { createdBy, updatedBy } from '../utils/helper.js'; // Ensure updatedBy is imported
 
-// GET /api/questions - With filtering, sorting, population
+// GET /api/questions - UPDATED with new filters
 export const getAllQuestions = async (req, res) => {
     try {
-        // Step 1: Get filter values from req.query
-        const { search, template, status, responseType } = req.query; // Added responseType filter
+        // Step 1: Get filter values (template REMOVED, rule and checkType ADDED)
+        const { search, status, responseType, rule, checkType } = req.query;
         console.log("[getAllQuestions] req.query:", req.query);
 
         // Step 2: Create dynamic Mongoose query object
         const query = {};
 
-        // Step 3: Add status, template, and responseType filters
+        // Step 3: Add filters
         if (status === "active" || status === "inactive") {
             query.status = status; // From commonFields
         }
-        if (template) {
-            query.template = template; // Template _id from frontend filter
+        if (rule) { // ✅ ADDED filter by rule
+            query.rule = rule;
+        }
+        if (checkType) { // ✅ ADDED filter by checkType
+            query.checkType = checkType;
         }
         if (responseType) {
              query.responseType = responseType; // Filter by response type
         }
 
-        // Step 4: Add search filter (searches in 'questionText', potentially 'section')
+        // Step 4: Add search filter (questionText, section)
         if (search) {
             const searchRegex = { $regex: search, $options: "i" };
             query.$or = [
                 { questionText: searchRegex },
-                { section: searchRegex }, // Include section in search if desired
+                { section: searchRegex },
             ];
         }
 
         console.log("[getAllQuestions] Final Mongoose Query:", JSON.stringify(query));
 
-        // Step 5: Find data, populate relationships, and sort
+        // Step 5: Find data, populate new fields
         const questions = await Question.find(query)
-            .populate('template', 'title') // Populate template title
-            .populate('createdBy', 'name email') // Populate creator
-            .populate('updatedBy', 'name email') // Populate updater
-            .sort({ createdAt: -1 }); // Sort by creation date
+            .populate('rule', 'name ruleCode category') // ✅ Populate new rule field
+            .populate('checkType', 'name') // ✅ Populate new checkType field
+            .populate('createdBy', 'name email')
+            .populate('updatedBy', 'name email')
+            .sort({ createdAt: -1 });
 
         // Step 6: Count total matching documents
         const count = await Question.countDocuments(query);
@@ -55,43 +59,45 @@ export const getAllQuestions = async (req, res) => {
 
     } catch (error) {
         console.error("[getAllQuestions] Error:", error);
-        res.status(500).json({ message: 'Server error', error: error.message });
+        res.status(500).json({ message: 'Server error', error: error.message, success: false });
     }
 };
 
-// GET /api/questions/:id - Update population and response format
+// GET /api/questions/:id - UPDATED population
 export const getQuestionById = async (req, res) => {
     try {
         const question = await Question.findById(req.params.id)
-            .populate('template', 'title')
+            .populate('rule', 'name ruleCode category') // ✅ Populate new rule field
+            .populate('checkType', 'name') // ✅ Populate new checkType field
+            // ❌ REMOVED: .populate('template', 'title')
             .populate('createdBy', 'name email')
-            .populate('updatedBy', 'name email'); // Populate updater
+            .populate('updatedBy', 'name email');
 
         if (!question) {
             return res.status(404).json({ message: 'Question not found', success: false });
         }
-
+        
         // Standard response format
         res.status(200).json({
             data: question,
             message: "Question fetched successfully",
-            success: true,
+            success: true
         });
-
     } catch (error) {
         console.error("[getQuestionById] Error:", error);
-        res.status(500).json({ message: 'Server error', error: error.message });
+        res.status(500).json({ message: 'Server error', error: error.message, success: false });
     }
 };
 
-// POST /api/questions - Update population and response format
+// POST /api/questions - UPDATED fields
 export const createQuestion = async (req, res) => {
     try {
-        const { section, questionText, responseType, severityDefault, weight, template } = req.body;
+        // ✅ template REMOVED, rule and checkType ADDED
+        const { section, questionText, responseType, severityDefault, weight, rule, checkType } = req.body;
 
-        // Validation (Required fields from schema)
-        if (!questionText || !responseType || !template) {
-            return res.status(400).json({ message: 'Question text, response type, and template are required', success: false });
+        // Validation
+        if (!questionText || !responseType) { // ✅ template check REMOVED
+            return res.status(400).json({ message: 'Question text and response type are required', success: false });
         }
 
         const newQuestion = new Question({
@@ -99,56 +105,65 @@ export const createQuestion = async (req, res) => {
             questionText,
             responseType,
             severityDefault,
-            weight, // Has default in schema
-            template,
-            ...createdBy(req) // Add createdBy
+            weight,
+            rule: rule || null, // ✅ ADDED (optional)
+            checkType: checkType || null, // ✅ ADDED (optional)
+            // ❌ template field REMOVED
+            ...createdBy(req)
         });
 
         let savedQuestion = await newQuestion.save();
 
         // Populate after saving
         savedQuestion = await Question.findById(savedQuestion._id)
-            .populate('template', 'title')
+            .populate('rule', 'name ruleCode') // ✅ Populate new fields
+            .populate('checkType', 'name') // ✅ Populate new fields
+            // ❌ REMOVED: .populate('template', 'title')
             .populate('createdBy', 'name email')
             .populate('updatedBy', 'name email');
-
-
-        // Standard response format
-        res.status(201).json({
-            data: savedQuestion,
+            
+        res.status(201).json({ 
+            data: savedQuestion, 
             message: 'Question created successfully',
             success: true
         });
-
     } catch (error) {
         console.error("[createQuestion] Error:", error);
-        // Add more specific error handling if needed (e.g., validation errors)
+        if (error.name === 'ValidationError') return res.status(400).json({ message: error.message, error: error.errors, success: false });
         res.status(400).json({ message: 'Error creating question', error: error.message, success: false });
     }
 };
 
-// PUT /api/questions/:id - Update population and response format
+// PUT /api/questions/:id - UPDATED fields (using PATCH logic)
 export const updateQuestion = async (req, res) => {
     try {
-        const { section, questionText, responseType, severityDefault, weight, template } = req.body;
+        // ✅ template REMOVED, rule and checkType ADDED
+        const { section, questionText, responseType, severityDefault, weight, rule, checkType, status } = req.body;
         const questionId = req.params.id;
 
-         // Validation
-        if (!questionText || !responseType || !template) {
-            return res.status(400).json({ message: 'Question text, response type, and template are required', success: false });
+        // Validation: Only check core fields if they are provided
+        if (questionText === '') { // Check if trying to empty required field
+            return res.status(400).json({ message: 'Question text cannot be empty', success: false });
         }
+         if (responseType === '') {
+            return res.status(400).json({ message: 'Response type cannot be empty', success: false });
+        }
+        
+        // Build update object dynamically for PATCH
+        const updateData = { ...updatedBy(req) };
+        if (section !== undefined) updateData.section = section;
+        if (questionText) updateData.questionText = questionText;
+        if (responseType) updateData.responseType = responseType;
+        if (severityDefault !== undefined) updateData.severityDefault = severityDefault;
+        if (weight) updateData.weight = weight;
+        if (rule !== undefined) updateData.rule = rule || null; // Allow setting to null
+        if (checkType !== undefined) updateData.checkType = checkType || null; // Allow setting to null
+        if (status) updateData.status = status;
+        // ❌ template field REMOVED
 
         let updatedQuestion = await Question.findByIdAndUpdate(
             questionId,
-            {
-                section,
-                questionText,
-                responseType,
-                severityDefault,
-                weight,
-                template,
-                ...updatedBy(req) // Add updatedBy
-            },
+            updateData, // Pass the dynamic update object
             { new: true, runValidators: true }
         );
 
@@ -156,40 +171,41 @@ export const updateQuestion = async (req, res) => {
             return res.status(404).json({ message: 'Question not found', success: false });
         }
 
-        // Populate after update
+        // Repopulate for response
         updatedQuestion = await Question.findById(updatedQuestion._id)
-            .populate('template', 'title')
+            .populate('rule', 'name ruleCode') // ✅ Populate new fields
+            .populate('checkType', 'name') // ✅ Populate new fields
+            // ❌ REMOVED: .populate('template', 'title')
             .populate('createdBy', 'name email')
             .populate('updatedBy', 'name email');
 
-        // Standard response format
-        res.status(200).json({
-            data: updatedQuestion,
+        res.status(200).json({ 
+            data: updatedQuestion, 
             message: 'Question updated successfully',
             success: true
         });
-
     } catch (error) {
         console.error("[updateQuestion] Error:", error);
+        if (error.name === 'ValidationError') return res.status(400).json({ message: error.message, error: error.errors, success: false });
         res.status(400).json({ message: 'Error updating question', error: error.message, success: false });
     }
 };
 
-// DELETE /api/questions/:id - Update response format
+// DELETE /api/questions/:id - (Added standard response)
 export const deleteQuestion = async (req, res) => {
     try {
         const deletedQuestion = await Question.findByIdAndDelete(req.params.id);
         if (!deletedQuestion) {
             return res.status(404).json({ message: 'Question not found', success: false });
         }
+        
+        // TODO: Check if this question is used in any Template? (Future enhancement)
 
-        // Standard response format
         res.status(200).json({
              message: 'Question deleted successfully',
              success: true,
              data: deletedQuestion // Optional
         });
-
     } catch (error) {
         console.error("[deleteQuestion] Error:", error);
         res.status(500).json({ message: 'Error deleting question', error: error.message, success: false });
