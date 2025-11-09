@@ -1,8 +1,8 @@
 // src/controllers/scheduleController.js
 
+import AuditSession from "../models/AuditSession.js";
 import Schedule from "../models/Schedule.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
-
 // GET /api/schedules - With filtering, sorting, population based on new schema
 export const getAllSchedules = async (req, res) => {
   try {
@@ -87,13 +87,11 @@ export const getScheduleById = async (req, res) => {
         .status(404)
         .json({ message: "Schedule not found", success: false });
 
-    res
-      .status(200)
-      .json({
-        data: schedule,
-        message: "Schedule fetched successfully",
-        success: true,
-      });
+    res.status(200).json({
+      data: schedule,
+      message: "Schedule fetched successfully",
+      success: true,
+    });
   } catch (error) {
     console.error("[getScheduleById] Error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -117,19 +115,17 @@ export const createSchedule = async (req, res) => {
 
     // Validation
     if (!title || !startDate || !endDate || !company) {
-      return res
-        .status(400)
-        .json({
-          message: "Title, Start Date, End Date, and Company are required",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "Title, Start Date, End Date, and Company are required",
+        success: false,
+      });
     }
     if (new Date(endDate) <= new Date(startDate)) {
       return res
         .status(400)
         .json({ message: "End date must be after start date", success: false });
     }
-
+    console.log("reached1");
     const newSchedule = new Schedule({
       title,
       startDate,
@@ -140,9 +136,11 @@ export const createSchedule = async (req, res) => {
       sites: sites || [], // Default to empty array if not provided
       assignedAuditors: assignedAuditors || [], // Default to empty array
       ...createdBy(req),
-      // status defaults to 'active' from commonFields
     });
+    console.log("reached2");
+    console.log(newSchedule, "from 147");
 
+    // return
     let savedSchedule = await newSchedule.save();
 
     // Repopulate for response
@@ -154,35 +152,29 @@ export const createSchedule = async (req, res) => {
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
-    res
-      .status(201)
-      .json({
-        data: savedSchedule,
-        message: "Schedule created successfully",
-        success: true,
-      });
+    res.status(201).json({
+      data: savedSchedule,
+      message: "Schedule created successfully",
+      success: true,
+    });
   } catch (error) {
     console.error("[createSchedule] Error:", error);
     if (error.code === 11000)
-      return res
-        .status(400)
-        .json({
-          message:
-            "A schedule for this company starting on this date already exists.",
-          error: error.message,
-          success: false,
-        });
+      return res.status(400).json({
+        message:
+          "A schedule for this company starting on this date already exists.",
+        error: error.message,
+        success: false,
+      });
     if (error.name === "ValidationError")
       return res
         .status(400)
         .json({ message: error.message, error: error.errors, success: false });
-    res
-      .status(400)
-      .json({
-        message: "Error creating schedule",
-        error: error.message,
-        success: false,
-      });
+    res.status(400).json({
+      message: "Error creating schedule",
+      error: error.message,
+      success: false,
+    });
   }
 };
 
@@ -205,12 +197,10 @@ export const updateSchedule = async (req, res) => {
 
     // Validation
     if (!title || !startDate || !endDate || !company) {
-      return res
-        .status(400)
-        .json({
-          message: "Title, Start Date, End Date, and Company are required",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "Title, Start Date, End Date, and Company are required",
+        success: false,
+      });
     }
     if (new Date(endDate) <= new Date(startDate)) {
       return res
@@ -265,35 +255,29 @@ export const updateSchedule = async (req, res) => {
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
-    res
-      .status(200)
-      .json({
-        data: updatedSchedule,
-        message: "Schedule updated successfully",
-        success: true,
-      });
+    res.status(200).json({
+      data: updatedSchedule,
+      message: "Schedule updated successfully",
+      success: true,
+    });
   } catch (error) {
     console.error("[updateSchedule] Error:", error);
     if (error.code === 11000)
-      return res
-        .status(400)
-        .json({
-          message:
-            "A schedule for this company starting on this date already exists.",
-          error: error.message,
-          success: false,
-        });
+      return res.status(400).json({
+        message:
+          "A schedule for this company starting on this date already exists.",
+        error: error.message,
+        success: false,
+      });
     if (error.name === "ValidationError")
       return res
         .status(400)
         .json({ message: error.message, error: error.errors, success: false });
-    res
-      .status(400)
-      .json({
-        message: "Error updating schedule",
-        error: error.message,
-        success: false,
-      });
+    res.status(400).json({
+      message: "Error updating schedule",
+      error: error.message,
+      success: false,
+    });
   }
 };
 
@@ -305,21 +289,139 @@ export const deleteSchedule = async (req, res) => {
       return res
         .status(404)
         .json({ message: "Schedule not found", success: false });
-    res
-      .status(200)
-      .json({
-        message: "Schedule deleted successfully",
-        success: true,
-        data: deletedSchedule,
-      });
+    res.status(200).json({
+      message: "Schedule deleted successfully",
+      success: true,
+      data: deletedSchedule,
+    });
   } catch (error) {
     console.error("[deleteSchedule] Error:", error);
+    res.status(500).json({
+      message: "Error deleting schedule",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+/**
+ * @route   POST /api/schedules/:id/start
+ * @desc    Ekta Schedule theke automatically AuditSession(s) to-ri kore
+ * @access  Private (Admin/Manager)
+ */
+// ... (apnar baki shob existing controller function, jemon getAllSchedules, etc.)
+
+// --- ✅ REPLACE YOUR OLD startScheduleAudits WITH THIS NEW, ROBUST ONE ---
+
+/**
+ * @route   POST /api/schedules/:id/start
+ * @desc    Ekta Schedule theke automatically AuditSession(s) to-ri kore
+ * @access  Private (Admin/Manager)
+ */
+export const startScheduleAudits = async (req, res) => {
+  try {
+    const scheduleId = req.params.id;
+
+    // 1. Schedule-take khuje ber kori ebong populate kori
+    const schedule = await Schedule.findById(scheduleId).populate({
+      path: "program",
+      populate: {
+        path: "template",
+        select: "checkType",
+      },
+    });
+
+    // --- 2. Robust Validation ---
+    if (!schedule) {
+      return res
+        .status(404)
+        .json({ message: "Schedule not found", success: false });
+    }
+    if (schedule.scheduleStatus !== "scheduled") {
+      return res.status(400).json({
+        message: `Cannot start a schedule that is already '${schedule.scheduleStatus}'.`,
+        success: false,
+      });
+    }
+    if (!schedule.sites || schedule.sites.length === 0) {
+      return res
+        .status(400)
+        .json({
+          message: "No sites are assigned to this schedule.",
+          success: false,
+        });
+    }
+    if (
+      !schedule.program ||
+      !schedule.program.template ||
+      typeof schedule.program.template !== "object"
+    ) {
+      return res.status(400).json({
+        message:
+          "Schedule's Program is not linked to a valid (or existing) Template.",
+        success: false,
+      });
+    }
+
+    // ✅ --- 3. NOTUN VALIDATION (THE FIX) ---
+    // Session create korar *agey* check kori, ei schedule-er kono session
+    // agey thekei database-e ache kina.
+    const existingSessionCount = await AuditSession.countDocuments({
+      schedule: schedule._id,
+    });
+
+    if (existingSessionCount > 0) {
+      // Jodi agey thekei session thake, kintu schedule 'scheduled' hoye thake,
+      // er mane agekar transaction-ta fail korechilo.
+      // Amra shudhu schedule-er status update kore dibo ebong error pathabo.
+      schedule.scheduleStatus = "in-progress"; // Fix the broken status
+      await schedule.save();
+      return res.status(400).json({
+        message:
+          "Sessions for this schedule already exist. Status has been corrected.",
+        success: false,
+      });
+    }
+
+    // --- 4. Notun AuditSession-er List To-ri Kori ---
+    // Ekhon amra nishchit (sure) je kono session agey theke nei.
+    const sessionsToCreate = schedule.sites.map((siteId) => ({
+      schedule: schedule._id,
+      template: schedule.program.template._id,
+      checkType: schedule.program.template.checkType,
+      site: siteId,
+      workflowStatus: "in-progress",
+      startDate: new Date(),
+      ...createdBy(req),
+    }));
+
+    // --- 5. Database-e Shob Session Ekbare Create Kori ---
+    const createdSessions = await AuditSession.insertMany(sessionsToCreate);
+
+    // --- 6. Parent Schedule-take Update Kori ---
+    schedule.scheduleStatus = "in-progress";
+    await schedule.save();
+
+    // --- 7. Frontend-ke Success Message Pathai ---
+    res.status(201).json({
+      message: `${createdSessions.length} audit session(s) created successfully.`,
+      data: createdSessions,
+      success: true,
+    });
+  } catch (error) {
+    console.error("[startScheduleAudits] Error:", error);
+    // 'insertMany' jodi abar kono karone fail kore (e.g., race condition)
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: "Audit sessions for this schedule and site(s) already exist.",
+        success: false,
+      });
+    }
     res
       .status(500)
       .json({
-        message: "Error deleting schedule",
+        message: "Server error starting schedule",
         error: error.message,
-        success: false,
       });
   }
 };
