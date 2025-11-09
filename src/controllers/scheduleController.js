@@ -1,8 +1,8 @@
 // src/controllers/scheduleController.js
 
+import AuditSession from "../models/AuditSession.js";
 import Schedule from "../models/Schedule.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
-
 // GET /api/schedules - With filtering, sorting, population based on new schema
 export const getAllSchedules = async (req, res) => {
   try {
@@ -304,92 +304,124 @@ export const deleteSchedule = async (req, res) => {
   }
 };
 
+/**
+ * @route   POST /api/schedules/:id/start
+ * @desc    Ekta Schedule theke automatically AuditSession(s) to-ri kore
+ * @access  Private (Admin/Manager)
+ */
+// ... (apnar baki shob existing controller function, jemon getAllSchedules, etc.)
+
+// --- ✅ REPLACE YOUR OLD startScheduleAudits WITH THIS NEW, ROBUST ONE ---
 
 /**
  * @route   POST /api/schedules/:id/start
- * @desc    Starts an audit by generating AuditSession(s) from a Schedule.
+ * @desc    Ekta Schedule theke automatically AuditSession(s) to-ri kore
  * @access  Private (Admin/Manager)
- * @logic   This is the core business logic for auditSession.
- * It finds the schedule, loops through its 'sites' array,
- * and creates one AuditSession per site, inheriting all
- * relational data to ensure 100% data integrity.
  */
-// export const startScheduleAudits = async (req, res) => {
-//   try {
-//     const scheduleId = req.params.id;
+export const startScheduleAudits = async (req, res) => {
+  try {
+    const scheduleId = req.params.id;
 
-//     // 1. Find the schedule and populate its relational data.
-//     // We must do a nested populate to get the Template's checkType.
-//     const schedule = await Schedule.findById(scheduleId).populate({
-//       path: "program",
-//       select: "template", // We only need the 'program' field
-//       populate: {
-//         path: "template", // Populate the 'template' field inside 'program'
-//         select: "checkType", // We only need the 'checkType' from the template
-//       },
-//     });
+    // 1. Schedule-take khuje ber kori ebong populate kori
+    const schedule = await Schedule.findById(scheduleId).populate({
+      path: "program",
+      populate: {
+        path: "template",
+        select: "checkType",
+      },
+    });
 
-//     // --- Validation (Guard Clauses) ---
-//     if (!schedule) {
-//       return res
-//         .status(404)
-//         .json({ message: "Schedule not found", success: false });
-//     }
-//     if (schedule.scheduleStatus !== "scheduled") {
-//       return res
-//         .status(400)
-//         .json({ message: `Cannot start a schedule that is already '${schedule.scheduleStatus}'.`, success: false });
-//     }
-//     if (!schedule.sites || schedule.sites.length === 0) {
-//       return res
-//         .status(400)
-//         .json({ message: "No sites are assigned to this schedule.", success: false });
-//     }
-//     if (!schedule.program || !schedule.program.template) {
-//       return res.status(400).json({
-//         message:
-//           "Schedule is not linked to a valid Program and Template. Cannot start.",
-//         success: false,
-//       });
-//     }
+    // --- 2. Robust Validation ---
+    if (!schedule) {
+      return res
+        .status(404)
+        .json({ message: "Schedule not found", success: false });
+    }
+    if (schedule.scheduleStatus !== "scheduled") {
+      return res.status(400).json({
+        message: `Cannot start a schedule that is already '${schedule.scheduleStatus}'.`,
+        success: false,
+      });
+    }
+    if (!schedule.sites || schedule.sites.length === 0) {
+      return res
+        .status(400)
+        .json({
+          message: "No sites are assigned to this schedule.",
+          success: false,
+        });
+    }
+    if (
+      !schedule.program ||
+      !schedule.program.template ||
+      typeof schedule.program.template !== "object"
+    ) {
+      return res.status(400).json({
+        message:
+          "Schedule's Program is not linked to a valid (or existing) Template.",
+        success: false,
+      });
+    }
 
-//     // 2. Build an array of new AuditSession documents to be created
-//     // This maps the array of site IDs into an array of new session objects.
-//     const sessionsToCreate = schedule.sites.map((siteId) => ({
-//       schedule: schedule._id,
-//       company: schedule.company, // Inherited from Schedule
-//       program: schedule.program._id, // Inherited from Schedule
-//       template: schedule.program.template._id, // Inherited from Program
-//       checkType: schedule.program.template.checkType, // Inherited from Template
-//       site: siteId, // ✅ This is the *one* site for this *one* session
-//       workflowStatus: "in-progress", // ✅ Per your flow
-//       startDate: new Date(), // Audit starts now
-//       ...createdBy(req), // The user who clicked the button
-//     }));
+    // ✅ --- 3. NOTUN VALIDATION (THE FIX) ---
+    // Session create korar *agey* check kori, ei schedule-er kono session
+    // agey thekei database-e ache kina.
+    const existingSessionCount = await AuditSession.countDocuments({
+      schedule: schedule._id,
+    });
 
-//     // 3. Create all sessions in a single, efficient database operation.
-//     // This is millions of times faster than using a loop.
-//     const createdSessions = await AuditSession.insertMany(sessionsToCreate);
+    if (existingSessionCount > 0) {
+      // Jodi agey thekei session thake, kintu schedule 'scheduled' hoye thake,
+      // er mane agekar transaction-ta fail korechilo.
+      // Amra shudhu schedule-er status update kore dibo ebong error pathabo.
+      schedule.scheduleStatus = "in-progress"; // Fix the broken status
+      await schedule.save();
+      return res.status(400).json({
+        message:
+          "Sessions for this schedule already exist. Status has been corrected.",
+        success: false,
+      });
+    }
 
-//     // 4. Update the original schedule's status to 'in-progress'
-//     schedule.scheduleStatus = "in-progress";
-//     await schedule.save();
+    // --- 4. Notun AuditSession-er List To-ri Kori ---
+    // Ekhon amra nishchit (sure) je kono session agey theke nei.
+    const sessionsToCreate = schedule.sites.map((siteId) => ({
+      schedule: schedule._id,
+      template: schedule.program.template._id,
+      checkType: schedule.program.template.checkType,
+      site: siteId,
+      workflowStatus: "in-progress",
+      startDate: new Date(),
+      ...createdBy(req),
+    }));
 
-//     res.status(201).json({
-//       message: `${createdSessions.length} audit session(s) created successfully.`,
-//       data: createdSessions,
-//       success: true,
-//     });
-//   } catch (error) {
-//     console.error("[startScheduleAudits] Error:", error);
-//     // Handle the unique index error
-//     if (error.code === 11000) {
-//          return res
-//         .status(400)
-//         .json({ message: "Audit sessions for this schedule and site(s) already exist.", success: false });
-//     }
-//     res
-//       .status(500)
-//       .json({ message: "Server error starting schedule", error: error.message });
-//   }
-// };
+    // --- 5. Database-e Shob Session Ekbare Create Kori ---
+    const createdSessions = await AuditSession.insertMany(sessionsToCreate);
+
+    // --- 6. Parent Schedule-take Update Kori ---
+    schedule.scheduleStatus = "in-progress";
+    await schedule.save();
+
+    // --- 7. Frontend-ke Success Message Pathai ---
+    res.status(201).json({
+      message: `${createdSessions.length} audit session(s) created successfully.`,
+      data: createdSessions,
+      success: true,
+    });
+  } catch (error) {
+    console.error("[startScheduleAudits] Error:", error);
+    // 'insertMany' jodi abar kono karone fail kore (e.g., race condition)
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: "Audit sessions for this schedule and site(s) already exist.",
+        success: false,
+      });
+    }
+    res
+      .status(500)
+      .json({
+        message: "Server error starting schedule",
+        error: error.message,
+      });
+  }
+};

@@ -36,10 +36,10 @@ router.delete(
   authorizeRoles("admin", "sysadmin"),
   scheduleController.deleteSchedule
 );
-// router.post(
-//   "/:id/start",
-//   auth,
-//   authorizeRoles("admin", "sysadmin", "audit_manager"), // Only managers can start an audit
-//   scheduleController.startScheduleAudits
-// );
+router.post(
+  "/:id/start",
+  auth,
+  authorizeRoles("admin", "sysadmin", "audit_manager"), // Only managers can start an audit
+  scheduleController.startScheduleAudits
+);
 export default router;
