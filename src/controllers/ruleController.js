@@ -6,40 +6,42 @@ import { createdBy, updatedBy } from "../utils/helper.js";
 // GET /api/rules - With filtering, sorting, population
 export const getAllRules = async (req, res) => {
   try {
-    // Step 1: Get filter values from req.query
-    // ✅ 'category' ebong 'ruleCode' filter add kora hoyeche
-    const { search, status, category, ruleCode } = req.query;
+    // Step 1: Get filter values (✅ category changed to checkType)
+    const { search, status, checkType, ruleCode } = req.query;
     console.log("[getAllRules] req.query:", req.query);
 
     // Step 2: Create dynamic Mongoose query object
     const query = {};
 
-    // Step 3: Add status & category filters
+    // Step 3: Add status & checkType filters
     if (status === "active" || status === "inactive") {
       query.status = status;
     }
-    if (category) {
-      query.category = { $regex: category, $options: "i" };
+    if (checkType) {
+      // ✅ Filter by checkType ID
+      query.checkType = checkType;
     }
     if (ruleCode) {
+      // ✅ Filter by ruleCode
       query.ruleCode = { $regex: ruleCode, $options: "i" };
     }
 
-    // Step 4: Add search filter (searches in name, description, ruleCode, category)
+    // Step 4: Add search filter (name, description, ruleCode)
     if (search) {
       const searchRegex = { $regex: search, $options: "i" };
       query.$or = [
         { name: searchRegex },
         { description: searchRegex },
-        { ruleCode: searchRegex }, // ✅ Notun field add
-        { category: searchRegex }, // ✅ Notun field add
+        { ruleCode: searchRegex }, // ✅ Search ruleCode
+        // Cannot search populated checkType.name without aggregation
       ];
     }
 
     console.log("[getAllRules] Final Mongoose Query:", JSON.stringify(query));
 
-    // Step 5: Find data, populate, and sort
+    // Step 5: Find data, populate new fields
     const rules = await Rule.find(query)
+      .populate("checkType", "name") // ✅ Populate checkType
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email")
       .sort({ createdAt: -1 });
@@ -66,8 +68,9 @@ export const getAllRules = async (req, res) => {
 export const getRuleById = async (req, res) => {
   try {
     const rule = await Rule.findById(req.params.id)
+      .populate("checkType", "name") // ✅ Populate checkType
       .populate("createdBy", "name email")
-      .populate("updatedBy", "name email"); // Populate updater
+      .populate("updatedBy", "name email");
 
     if (!rule) {
       return res
@@ -92,28 +95,31 @@ export const getRuleById = async (req, res) => {
 // POST /api/rules - Update population and response format
 export const createRule = async (req, res) => {
   try {
-    // ✅ Notun field add
-    const { name, description, ruleCode, category } = req.body;
+    // ✅ category changed to checkType, ruleCode added
+    const { name, description, ruleCode, checkType } = req.body;
 
     // Validation
-    if (!name || !ruleCode || !category) {
-      return res.status(400).json({
-        message: "Name, Rule Code, and Category are required",
-        success: false,
-      });
+    if (!name || !ruleCode || !checkType) {
+      return res
+        .status(400)
+        .json({
+          message: "Name, Rule Code, and Check Type are required",
+          success: false,
+        });
     }
 
     const newRule = new Rule({
       name,
       description,
-      ruleCode, // ✅ Notun field
-      category, // ✅ Notun field
+      ruleCode, // ✅ Added
+      checkType, // ✅ Added
       ...createdBy(req),
     });
     let savedRule = await newRule.save();
 
     // Populate after saving
     savedRule = await Rule.findById(savedRule._id)
+      .populate("checkType", "name")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
@@ -126,46 +132,52 @@ export const createRule = async (req, res) => {
   } catch (error) {
     console.error("[createRule] Error:", error);
     if (error.code === 11000) {
-      // Handle potential duplicate ruleCode error
-      return res.status(400).json({
-        message: "Rule Code already exists.",
-        error: error.message,
-        success: false,
-      });
+      // Handle duplicate ruleCode error
+      return res
+        .status(400)
+        .json({
+          message: "Rule Code already exists.",
+          error: error.message,
+          success: false,
+        });
     }
     if (error.name === "ValidationError")
       return res
         .status(400)
         .json({ message: error.message, error: error.errors, success: false });
-    res.status(400).json({
-      message: "Error creating rule",
-      error: error.message,
-      success: false,
-    });
+    res
+      .status(400)
+      .json({
+        message: "Error creating rule",
+        error: error.message,
+        success: false,
+      });
   }
 };
 
 // PUT /api/rules/:id - Update population and response format
 export const updateRule = async (req, res) => {
   try {
-    // ✅ Notun field add
-    const { name, description, ruleCode, category, status } = req.body;
+    // ✅ category changed to checkType, ruleCode added
+    const { name, description, ruleCode, checkType, status } = req.body;
     const ruleId = req.params.id;
 
     // Validation
-    if (!name || !ruleCode || !category) {
-      return res.status(400).json({
-        message: "Name, Rule Code, and Category are required",
-        success: false,
-      });
+    if (!name || !ruleCode || !checkType) {
+      return res
+        .status(400)
+        .json({
+          message: "Name, Rule Code, and Check Type are required",
+          success: false,
+        });
     }
 
     const updateData = {
       name,
       description,
-      ruleCode, // ✅ Notun field
-      category, // ✅ Notun field
-      status, // ✅ Status update add
+      ruleCode, // ✅ Added
+      checkType, // ✅ Added
+      status, // ✅ Status update
       ...updatedBy(req),
     };
 
@@ -182,6 +194,7 @@ export const updateRule = async (req, res) => {
 
     // Populate after update
     updatedRule = await Rule.findById(updatedRule._id)
+      .populate("checkType", "name")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
@@ -194,22 +207,26 @@ export const updateRule = async (req, res) => {
   } catch (error) {
     console.error("[updateRule] Error:", error);
     if (error.code === 11000) {
-      // Handle potential duplicate ruleCode error
-      return res.status(400).json({
-        message: "Rule Code already exists.",
-        error: error.message,
-        success: false,
-      });
+      // Handle duplicate ruleCode error
+      return res
+        .status(400)
+        .json({
+          message: "Rule Code already exists.",
+          error: error.message,
+          success: false,
+        });
     }
     if (error.name === "ValidationError")
       return res
         .status(400)
         .json({ message: error.message, error: error.errors, success: false });
-    res.status(400).json({
-      message: "Error updating rule",
-      error: error.message,
-      success: false,
-    });
+    res
+      .status(400)
+      .json({
+        message: "Error updating rule",
+        error: error.message,
+        success: false,
+      });
   }
 };
 
@@ -222,20 +239,23 @@ export const deleteRule = async (req, res) => {
         .status(404)
         .json({ message: "Rule not found", success: false });
     }
-    // TODO: Check if this rule is used in any Question? (Future enhancement)
+
+    // TODO: Check if this rule is used in any Question and prevent deletion? (Future)
 
     // Standard response format
     res.status(200).json({
       message: "Rule deleted successfully",
       success: true,
-      data: deletedRule, // Optional
+      data: deletedRule,
     });
   } catch (error) {
     console.error("[deleteRule] Error:", error);
-    res.status(500).json({
-      message: "Error deleting rule",
-      error: error.message,
-      success: false,
-    });
+    res
+      .status(500)
+      .json({
+        message: "Error deleting rule",
+        error: error.message,
+        success: false,
+      });
   }
 };

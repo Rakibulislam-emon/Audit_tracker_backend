@@ -18,24 +18,27 @@ const templateSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Company', 
     required: [true, 'Company is required.']
+    
+  },
+ 
+  checkType: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CheckType',
+    required: [true, 'Check Type is required.']
   },
   
  
-  // ✅ ADDED: Array of Questions (as per audit_next.pdf )
-  // This makes the Template a "Collection of Questions"
   questions: [{ 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Question' 
   }],
-
-  // --- CHANGES END HERE ---
 
   ...commonFields // status, createdBy, updatedBy
 }, {
   timestamps: true
 });
 
-// Index for faster query by company and checkType
+// Index for faster query
 templateSchema.index({ company: 1, checkType: 1 });
 
 export default mongoose.models.Template || mongoose.model('Template', templateSchema);

@@ -1,7 +1,7 @@
 // src/controllers/checkTypeController.js
 
 import CheckType from "../models/CheckType.js";
-import { createdBy } from "../utils/helper.js";
+import { createdBy, updatedBy } from "../utils/helper.js";
 
 // GET /api/check-types - With filtering, sorting, population
 export const getAllCheckTypes = async (req, res) => {

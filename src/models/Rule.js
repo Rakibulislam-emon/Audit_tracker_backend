@@ -11,13 +11,18 @@ const ruleSchema = new mongoose.Schema(
     ruleCode: {
       type: String,
       trim: true,
-      unique: true,
+
       required: [true, "Rule Code (e.g., SAF-001) is required."],
     },
-    category: {
-      type: String,
-      trim: true,
-      required: [true, "Category (e.g., Safety, Finance) is required."],
+    // category: {
+    //   type: String,
+    //   trim: true,
+    //   required: [true, "Category (e.g., Safety, Finance) is required."],
+    // },
+    checkType: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CheckType",
+      required: [true, "Check Type (Category) is required."],
     },
     description: {
       type: String,
@@ -30,7 +35,6 @@ const ruleSchema = new mongoose.Schema(
   }
 );
 
-ruleSchema.index({ ruleCode: 1 });
-ruleSchema.index({ category: 1 });
+ruleSchema.index({ ruleCode: 1 }, { unique: true });
 
 export default mongoose.models.Rule || mongoose.model("Rule", ruleSchema);
