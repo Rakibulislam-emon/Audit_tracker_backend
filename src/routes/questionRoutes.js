@@ -35,7 +35,7 @@ router.post(
 );
 
 // PUT /api/questions/:id - Update
-router.put(
+router.patch(
   "/:id",
   auth,
   authorizeRoles("admin", "sysadmin", "audit_manager"), // Common create/edit roles

@@ -344,12 +344,10 @@ export const startScheduleAudits = async (req, res) => {
       });
     }
     if (!schedule.sites || schedule.sites.length === 0) {
-      return res
-        .status(400)
-        .json({
-          message: "No sites are assigned to this schedule.",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "No sites are assigned to this schedule.",
+        success: false,
+      });
     }
     if (
       !schedule.program ||
@@ -386,6 +384,7 @@ export const startScheduleAudits = async (req, res) => {
     // --- 4. Notun AuditSession-er List To-ri Kori ---
     // Ekhon amra nishchit (sure) je kono session agey theke nei.
     const sessionsToCreate = schedule.sites.map((siteId) => ({
+      title: `${schedule.title} - ${new Date().toLocaleDateString()}`,
       schedule: schedule._id,
       template: schedule.program.template._id,
       checkType: schedule.program.template.checkType,
@@ -417,11 +416,9 @@ export const startScheduleAudits = async (req, res) => {
         success: false,
       });
     }
-    res
-      .status(500)
-      .json({
-        message: "Server error starting schedule",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Server error starting schedule",
+      error: error.message,
+    });
   }
 };

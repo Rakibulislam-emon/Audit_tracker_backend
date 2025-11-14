@@ -58,7 +58,7 @@ export const getAllObservations = async (req, res) => {
     const observations = await Observation.find(query)
       .populate("auditSession", "title") // Populate session title
       .populate("question", "questionText responseType") // Populate original question text/type
-      .populate("problem", "problemId title") // Populate linked problem ID/title (if exists)
+      .populate("problem", "problemId title") // Populate  problem ID/title (if exists)
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email")
       .sort({ createdAt: -1 }); // Sort by creation date
