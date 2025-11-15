@@ -64,7 +64,7 @@ export const getAllProblems = async (req, res) => {
     // Step 5: Find data, populate relationships, and sort
     const problems = await Problem.find(query)
       .populate("auditSession", "title") // Populate relevant session info
-      .populate("observation", "_id severity") // Populate linked observation's severity?
+      .populate("observation", "_id severity response") // Populate linked observation's severity and response
       .populate("question", "questionText") // Populate linked question text
       .populate("fixActions", "_id title status") // Populate linked fix actions
       .populate("createdBy", "name email")
@@ -92,7 +92,7 @@ export const getProblemById = async (req, res) => {
   try {
     const problem = await Problem.findById(req.params.id)
       .populate("auditSession", "title")
-      .populate("observation", "_id severity resolutionStatus")
+      .populate("observation", "_id severity resolutionStatus response")
       .populate("question", "questionText")
       .populate("fixActions", "_id title status")
       .populate("createdBy", "name email")
@@ -130,10 +130,11 @@ export const createProblem = async (req, res) => {
       likelihood,
       riskRating,
       problemStatus,
-      methodology,
+      // methodology,
       fixActions,
     } = req.body;
-
+ console.log("[createProblem] req.body:", req.body);
+   
     // Validation (Required fields from schema)
     if (
       !auditSession ||
@@ -174,7 +175,7 @@ export const createProblem = async (req, res) => {
       likelihood,
       riskRating,
       problemStatus: problemStatus || "Open", // Use provided or default
-      methodology,
+      // methodology,
       fixActions: fixActions || [], // Default to empty array
       ...createdBy(req),
       // status defaults to 'active'
@@ -185,7 +186,7 @@ export const createProblem = async (req, res) => {
     // Repopulate for response
     savedProblem = await Problem.findById(savedProblem._id)
       .populate("auditSession", "title")
-      .populate("observation", "_id severity resolutionStatus")
+      .populate("observation", "_id severity resolutionStatus response")
       .populate("question", "questionText")
       .populate("fixActions", "_id title status")
       .populate("createdBy", "name email")
@@ -237,7 +238,7 @@ export const updateProblem = async (req, res) => {
       riskRating,
       status,
       problemStatus,
-      methodology,
+      // methodology,
       fixActions,
     } = req.body;
     const problemId = req.params.id;
@@ -273,7 +274,7 @@ export const updateProblem = async (req, res) => {
     if (observation !== undefined) updateData.observation = observation || null;
     if (question !== undefined) updateData.question = question || null;
     if (problemStatus) updateData.problemStatus = problemStatus;
-    if (methodology !== undefined) updateData.methodology = methodology;
+    // // // if (methodology !== undefined) updateData.methodology = methodology;
     if (fixActions !== undefined) updateData.fixActions = fixActions || []; // Allow updating fix actions
     if (status === "active" || status === "inactive")
       updateData.status = status;
@@ -292,7 +293,7 @@ export const updateProblem = async (req, res) => {
     // Repopulate for response
     updatedProblem = await Problem.findById(updatedProblem._id)
       .populate("auditSession", "title")
-      .populate("observation", "_id severity resolutionStatus")
+      .populate("observation", "_id severity resolutionStatus response")
       .populate("question", "questionText")
       .populate("fixActions", "_id title status") // Populate linked fix actions
       .populate("createdBy", "name email")

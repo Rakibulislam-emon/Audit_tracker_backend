@@ -11,7 +11,7 @@ const questionSchema = new mongoose.Schema(
     responseType: {
       type: String,
       required: true,
-      enum: ["yes/no", "text", "number", "rating", "dropdown"],
+      enum: ["yes/no", "text", "number"],
     },
     severityDefault: String,
     weight: {
@@ -31,6 +31,18 @@ const questionSchema = new mongoose.Schema(
       ref: "CheckType",
       required: false,
     },
+    applicableSites: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Site",
+        default: [], // Empty array = applies to ALL sites
+      },
+    ],
+    // template:{
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Template",
+    //   required: false,
+    // },
     ...commonFields,
   },
   {
@@ -40,5 +52,7 @@ const questionSchema = new mongoose.Schema(
 // Index for better searching
 questionSchema.index({ checkType: 1 });
 questionSchema.index({ rule: 1 });
+questionSchema.index({ applicableSites: 1 });
+// questionSchema.index({ template: 1 });
 export default mongoose.models.Question ||
   mongoose.model("Question", questionSchema);
