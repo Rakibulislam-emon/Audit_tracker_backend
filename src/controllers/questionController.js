@@ -1,6 +1,7 @@
 // src/controllers/questionController.js
 
 import Question from "../models/Question.js";
+import Template from "../models/Template.js"; // Import Template model for template filtering
 import { createdBy, updatedBy } from "../utils/helper.js"; // Ensure updatedBy is imported
 
 // GET /api/questions - UPDATED with new filters
@@ -43,17 +44,36 @@ export const getAllQuestions = async (req, res) => {
       query.$or = [
         { applicableSites: { $in: [site] } }, // Site-specific questions
         { applicableSites: { $size: 0 } }, // OR questions for all sites
+        { applicableSites: { $exists: false } }, // OR questions for all sites
       ];
       console.log(`[getAllQuestions] Site filtering applied for site: ${site}`);
     }
 
     // 🎯 STEP 5: TEMPLATE FILTERING - We'll handle this later
-    // For now, we'll focus on fixing the site filtering issue
     if (template) {
-      console.log(
-        `[getAllQuestions] Template parameter received: ${template}, but template filtering not yet implemented`
-      );
-      query.template = template; // Placeholder for future template filtering
+      console.log(`[getAllQuestions] Template filtering for: ${template}`);
+
+      try {
+        // 1. Find the template and get its question IDs
+        const templateDoc = await Template.findById(template).select(
+          "questions"
+        );
+
+        if (templateDoc && templateDoc.questions.length > 0) {
+          // 2. Show ONLY questions that are in this template
+          query._id = { $in: templateDoc.questions };
+          console.log(
+            `[getAllQuestions] Showing ${templateDoc.questions.length} questions from template`
+          );
+        } else {
+          // 3. If template has no questions, return empty
+          query._id = { $in: [] };
+          console.log(`[getAllQuestions] Template has no questions`);
+        }
+      } catch (error) {
+        console.error(`[getAllQuestions] Template lookup error:`, error);
+        // On error, don't filter (show all questions)
+      }
     }
 
     // 🎯 STEP 6: Add search filter (existing code - fixed for $or logic)

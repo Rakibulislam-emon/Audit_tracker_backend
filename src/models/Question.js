@@ -38,11 +38,11 @@ const questionSchema = new mongoose.Schema(
         default: [], // Empty array = applies to ALL sites
       },
     ],
-    template:{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Template",
-      required: true,
-    },
+    // template:{
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Template",
+    //   required: false,
+    // },
     ...commonFields,
   },
   {
@@ -53,6 +53,6 @@ const questionSchema = new mongoose.Schema(
 questionSchema.index({ checkType: 1 });
 questionSchema.index({ rule: 1 });
 questionSchema.index({ applicableSites: 1 });
-questionSchema.index({ template: 1 });
+// questionSchema.index({ template: 1 });
 export default mongoose.models.Question ||
   mongoose.model("Question", questionSchema);
