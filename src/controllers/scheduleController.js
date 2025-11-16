@@ -1,23 +1,23 @@
-// src/controllers/scheduleController.js
-
 import AuditSession from "../models/AuditSession.js";
 import Schedule from "../models/Schedule.js";
+import Team from "../models/Team.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
-// GET /api/schedules - With filtering, sorting, population based on new schema
+
+/**
+ * Retrieves a list of schedules with advanced filtering, sorting, and population.
+ * Supports filtering by company, program, status, site, and auditor.
+ * @route GET /api/schedules
+ */
 export const getAllSchedules = async (req, res) => {
   try {
-    // Step 1: Get filter values
     const { search, company, program, status, scheduleStatus, site, auditor } =
-      req.query; // Added site, auditor
-    console.log("[getAllSchedules] req.query:", req.query);
+      req.query;
 
-    // Step 2: Create query object
     const query = {};
 
-    // Step 3: Add filters
     if (company) query.company = company;
     if (program) query.program = program;
-    if (status === "active" || status === "inactive") query.status = status; // System status
+    if (status === "active" || status === "inactive") query.status = status;
     if (
       scheduleStatus &&
       [
@@ -28,37 +28,27 @@ export const getAllSchedules = async (req, res) => {
         "cancelled",
       ].includes(scheduleStatus)
     ) {
-      query.scheduleStatus = scheduleStatus; // Operational status
+      query.scheduleStatus = scheduleStatus;
     }
-    // Filter if schedule includes a specific site or auditor
-    if (site) query.sites = site; // Matches if the site ID is in the sites array
-    if (auditor) query.assignedAuditors = auditor; // Matches if the auditor ID is in the assignedAuditors array
+    if (site) query.sites = site;
+    if (auditor) query.assignedUser = auditor;
 
-    // Step 4: Add search filter (searches in 'title')
     if (search) {
       const searchRegex = { $regex: search, $options: "i" };
       query.title = searchRegex;
     }
 
-    console.log(
-      "[getAllSchedules] Final Mongoose Query:",
-      JSON.stringify(query)
-    );
-
-    // Step 5: Find data, populate relationships, and sort
     const schedules = await Schedule.find(query)
       .populate("company", "name")
       .populate("program", "name")
-      .populate("sites", "name") // Populate site names
-      .populate("assignedAuditors", "name email") // Populate auditor names/emails
+      .populate("sites", "name")
+      .populate("assignedUser", "name email")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email")
-      .sort({ startDate: 1 }); // Sort by start date
+      .sort({ startDate: 1 });
 
-    // Step 6: Count total matching documents
     const count = await Schedule.countDocuments(query);
 
-    // Standard response format
     res.status(200).json({
       data: schedules,
       count: count,
@@ -71,21 +61,26 @@ export const getAllSchedules = async (req, res) => {
   }
 };
 
-// GET /api/schedules/:id - Update population
+/**
+ * Retrieves a single schedule by its unique MongoDB ID.
+ * Populates all related fields for a detailed view.
+ * @route GET /api/schedules/:id
+ */
 export const getScheduleById = async (req, res) => {
   try {
     const schedule = await Schedule.findById(req.params.id)
       .populate("company", "name")
       .populate("program", "name")
-      .populate("sites", "name") // Populate sites
-      .populate("assignedAuditors", "name email") // Populate auditors
+      .populate("sites", "name")
+      .populate("assignedUser", "name email")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
-    if (!schedule)
+    if (!schedule) {
       return res
         .status(404)
         .json({ message: "Schedule not found", success: false });
+    }
 
     res.status(200).json({
       data: schedule,
@@ -98,10 +93,13 @@ export const getScheduleById = async (req, res) => {
   }
 };
 
-// POST /api/schedules - Include new fields, updated error handling
+/**
+ * Creates a new schedule in the database.
+ * Validates required fields and date logic.
+ * @route POST /api/schedules
+ */
 export const createSchedule = async (req, res) => {
   try {
-    // Include new fields from schema
     const {
       title,
       startDate,
@@ -110,10 +108,9 @@ export const createSchedule = async (req, res) => {
       program,
       scheduleStatus,
       sites,
-      assignedAuditors,
+      assignedUser,
     } = req.body;
 
-    // Validation
     if (!title || !startDate || !endDate || !company) {
       return res.status(400).json({
         message: "Title, Start Date, End Date, and Company are required",
@@ -125,30 +122,26 @@ export const createSchedule = async (req, res) => {
         .status(400)
         .json({ message: "End date must be after start date", success: false });
     }
-    console.log("reached1");
+
     const newSchedule = new Schedule({
       title,
       startDate,
       endDate,
       company,
       program: program || null,
-      scheduleStatus: scheduleStatus || "scheduled", // Use provided or default
-      sites: sites || [], // Default to empty array if not provided
-      assignedAuditors: assignedAuditors || [], // Default to empty array
+      scheduleStatus: scheduleStatus || "scheduled",
+      sites: sites || [],
+      assignedUser: assignedUser || null,
       ...createdBy(req),
     });
-    console.log("reached2");
-    console.log(newSchedule, "from 147");
 
-    // return
     let savedSchedule = await newSchedule.save();
 
-    // Repopulate for response
     savedSchedule = await Schedule.findById(savedSchedule._id)
       .populate("company", "name")
       .populate("program", "name")
       .populate("sites", "name")
-      .populate("assignedAuditors", "name email")
+      .populate("assignedUser", "name email")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
@@ -159,17 +152,19 @@ export const createSchedule = async (req, res) => {
     });
   } catch (error) {
     console.error("[createSchedule] Error:", error);
-    if (error.code === 11000)
+    if (error.code === 11000) {
       return res.status(400).json({
         message:
           "A schedule for this company starting on this date already exists.",
         error: error.message,
         success: false,
       });
-    if (error.name === "ValidationError")
+    }
+    if (error.name === "ValidationError") {
       return res
         .status(400)
         .json({ message: error.message, error: error.errors, success: false });
+    }
     res.status(400).json({
       message: "Error creating schedule",
       error: error.message,
@@ -178,10 +173,13 @@ export const createSchedule = async (req, res) => {
   }
 };
 
-// PUT /api/schedules/:id - Include new fields, updated error handling
+/**
+ * Updates an existing schedule by its ID.
+ * Allows partial updates and enforces schema validation.
+ * @route PUT /api/schedules/:id
+ */
 export const updateSchedule = async (req, res) => {
   try {
-    // Include all fields from schema
     const {
       title,
       startDate,
@@ -191,11 +189,10 @@ export const updateSchedule = async (req, res) => {
       status,
       scheduleStatus,
       sites,
-      assignedAuditors,
+      assignedUser,
     } = req.body;
     const scheduleId = req.params.id;
 
-    // Validation
     if (!title || !startDate || !endDate || !company) {
       return res.status(400).json({
         message: "Title, Start Date, End Date, and Company are required",
@@ -208,18 +205,17 @@ export const updateSchedule = async (req, res) => {
         .json({ message: "End date must be after start date", success: false });
     }
 
-    // Build update object dynamically
     const updateData = {
       title,
       startDate,
       endDate,
       company,
       program: program || null,
-      sites: sites || [], // Allow updating sites array
-      assignedAuditors: assignedAuditors || [], // Allow updating auditors array
+      sites: sites || [],
+      assignedUser: assignedUser || null,
       ...updatedBy(req),
     };
-    // Only include statuses if they are provided
+
     if (status === "active" || status === "inactive")
       updateData.status = status;
     if (
@@ -241,17 +237,17 @@ export const updateSchedule = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!updatedSchedule)
+    if (!updatedSchedule) {
       return res
         .status(404)
         .json({ message: "Schedule not found", success: false });
+    }
 
-    // Repopulate for response
     updatedSchedule = await Schedule.findById(updatedSchedule._id)
       .populate("company", "name")
       .populate("program", "name")
       .populate("sites", "name")
-      .populate("assignedAuditors", "name email")
+      .populate("assignedUser", "name email")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
@@ -262,17 +258,19 @@ export const updateSchedule = async (req, res) => {
     });
   } catch (error) {
     console.error("[updateSchedule] Error:", error);
-    if (error.code === 11000)
+    if (error.code === 11000) {
       return res.status(400).json({
         message:
           "A schedule for this company starting on this date already exists.",
         error: error.message,
         success: false,
       });
-    if (error.name === "ValidationError")
+    }
+    if (error.name === "ValidationError") {
       return res
         .status(400)
         .json({ message: error.message, error: error.errors, success: false });
+    }
     res.status(400).json({
       message: "Error updating schedule",
       error: error.message,
@@ -281,14 +279,19 @@ export const updateSchedule = async (req, res) => {
   }
 };
 
-// DELETE /api/schedules/:id - No changes needed
+/**
+ * Deletes a schedule by its MongoDB ID.
+ * Note: This is a hard delete.
+ * @route DELETE /api/schedules/:id
+ */
 export const deleteSchedule = async (req, res) => {
   try {
     const deletedSchedule = await Schedule.findByIdAndDelete(req.params.id);
-    if (!deletedSchedule)
+    if (!deletedSchedule) {
       return res
         .status(404)
         .json({ message: "Schedule not found", success: false });
+    }
     res.status(200).json({
       message: "Schedule deleted successfully",
       success: true,
@@ -305,33 +308,27 @@ export const deleteSchedule = async (req, res) => {
 };
 
 /**
- * @route   POST /api/schedules/:id/start
- * @desc    Ekta Schedule theke automatically AuditSession(s) to-ri kore
- * @access  Private (Admin/Manager)
- */
-// ... (apnar baki shob existing controller function, jemon getAllSchedules, etc.)
-
-// --- ✅ REPLACE YOUR OLD startScheduleAudits WITH THIS NEW, ROBUST ONE ---
-
-/**
- * @route   POST /api/schedules/:id/start
- * @desc    Ekta Schedule theke automatically AuditSession(s) to-ri kore
- * @access  Private (Admin/Manager)
+ * Atomically creates multiple AuditSessions and Teams from a single Schedule.
+ * For each site in the schedule, an AuditSession is created.
+ * If an auditor is assigned to the schedule, a Team is also created for each new session.
+ * The parent Schedule's status is updated to 'in-progress' upon success.
+ * @route POST /api/schedules/:id/start
  */
 export const startScheduleAudits = async (req, res) => {
   try {
     const scheduleId = req.params.id;
 
-    // 1. Schedule-take khuje ber kori ebong populate kori
-    const schedule = await Schedule.findById(scheduleId).populate({
-      path: "program",
-      populate: {
-        path: "template",
-        select: "checkType",
-      },
-    });
+    const schedule = await Schedule.findById(scheduleId)
+      .populate({
+        path: "program",
+        populate: {
+          path: "template",
+          select: "checkType",
+        },
+      })
+      .populate("assignedUser", "name email")
+      .populate("sites", "name");
 
-    // --- 2. Robust Validation ---
     if (!schedule) {
       return res
         .status(404)
@@ -349,11 +346,7 @@ export const startScheduleAudits = async (req, res) => {
         success: false,
       });
     }
-    if (
-      !schedule.program ||
-      !schedule.program.template ||
-      typeof schedule.program.template !== "object"
-    ) {
+    if (!schedule.program?.template) {
       return res.status(400).json({
         message:
           "Schedule's Program is not linked to a valid (or existing) Template.",
@@ -361,18 +354,12 @@ export const startScheduleAudits = async (req, res) => {
       });
     }
 
-    // ✅ --- 3. NOTUN VALIDATION (THE FIX) ---
-    // Session create korar *agey* check kori, ei schedule-er kono session
-    // agey thekei database-e ache kina.
     const existingSessionCount = await AuditSession.countDocuments({
       schedule: schedule._id,
     });
 
     if (existingSessionCount > 0) {
-      // Jodi agey thekei session thake, kintu schedule 'scheduled' hoye thake,
-      // er mane agekar transaction-ta fail korechilo.
-      // Amra shudhu schedule-er status update kore dibo ebong error pathabo.
-      schedule.scheduleStatus = "in-progress"; // Fix the broken status
+      schedule.scheduleStatus = "in-progress";
       await schedule.save();
       return res.status(400).json({
         message:
@@ -381,8 +368,6 @@ export const startScheduleAudits = async (req, res) => {
       });
     }
 
-    // --- 4. Notun AuditSession-er List To-ri Kori ---
-    // Ekhon amra nishchit (sure) je kono session agey theke nei.
     const sessionsToCreate = schedule.sites.map((siteId) => ({
       title: `${schedule.title} - ${new Date().toLocaleDateString()}`,
       schedule: schedule._id,
@@ -394,22 +379,38 @@ export const startScheduleAudits = async (req, res) => {
       ...createdBy(req),
     }));
 
-    // --- 5. Database-e Shob Session Ekbare Create Kori ---
     const createdSessions = await AuditSession.insertMany(sessionsToCreate);
 
-    // --- 6. Parent Schedule-take Update Kori ---
+    if (schedule.assignedUser) {
+      const teamPromises = createdSessions.map((session) => {
+        const teamData = {
+          user: schedule.assignedUser._id || schedule.assignedUser,
+          roleInTeam: "lead",
+          auditSession: session._id,
+          ...createdBy(req),
+        };
+        return Team.create(teamData);
+      });
+
+      await Promise.all(teamPromises);
+    }
+
     schedule.scheduleStatus = "in-progress";
     await schedule.save();
 
-    // --- 7. Frontend-ke Success Message Pathai ---
+    const successMessage = `${
+      createdSessions.length
+    } audit session(s) created successfully.${
+      schedule.assignedUser ? " Teams auto-created with assigned user." : ""
+    }`;
+
     res.status(201).json({
-      message: `${createdSessions.length} audit session(s) created successfully.`,
+      message: successMessage,
       data: createdSessions,
       success: true,
     });
   } catch (error) {
     console.error("[startScheduleAudits] Error:", error);
-    // 'insertMany' jodi abar kono karone fail kore (e.g., race condition)
     if (error.code === 11000) {
       return res.status(400).json({
         message: "Audit sessions for this schedule and site(s) already exist.",

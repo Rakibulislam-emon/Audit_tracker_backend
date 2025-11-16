@@ -57,13 +57,11 @@ const scheduleSchema = new mongoose.Schema(
         required: false,
       },
     ],
-    assignedAuditors: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-        required: false,
-      },
-    ],
+    assignedUser: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+    },
     ...commonFields,
   },
   {

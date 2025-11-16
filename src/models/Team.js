@@ -18,7 +18,7 @@ const teamSchema = new mongoose.Schema(
       required: [true, "Role within the team is required."],
       trim: true,
       enum: {
-        values: ["lead", "member", "observer", "specialist"],
+        values: ["lead", "member", "observer", "specialist",],
         message: "{VALUE} is not a valid role in this team.",
       },
     },
