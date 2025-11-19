@@ -66,7 +66,13 @@ const reportSchema = new mongoose.Schema(
     },
     reportStatus: {
       type: String,
-      enum: ["generating", "completed", "published", "archived"],
+      enum: [
+        "generating",
+        "completed",
+        "pending_approval",
+        "published",
+        "archived",
+      ], // ✅ ADDED pending_approval
       default: "generating",
     },
     filePath: String, // If report is saved as PDF

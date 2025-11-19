@@ -238,13 +238,14 @@ export const createApproval = async (req, res) => {
 };
 
 // ৪. Update approval (basic info) (✅ Standard Response, validation, helper fix)
+// In updateApproval function - fix the reviewHistory action
 export const updateApproval = async (req, res) => {
   try {
     const { title, description, priority, deadline, status, requirements } =
       req.body;
     const approvalId = req.params.id;
 
-    const updateData = { ...updatedBy(req) }; // ✅ Use common helper
+    const updateData = { ...updatedBy(req) };
     if (title) updateData.title = title;
     if (description) updateData.description = description;
     if (priority) updateData.priority = priority;
@@ -260,10 +261,10 @@ export const updateApproval = async (req, res) => {
         .json({ message: "Approval not found", success: false });
     }
 
-    // ✅ Manually add to review history
+    // ✅ FIX: Use valid enum value for reviewHistory action
     approval.reviewHistory.push({
       reviewedBy: req.user?.id,
-      action: "updated", // Custom action type
+      action: "reviewed", // ✅ CHANGED from "updated" to "reviewed"
       comments: "Approval request basic details updated",
       reviewedAt: new Date(),
     });
@@ -281,7 +282,7 @@ export const updateApproval = async (req, res) => {
     ).populate("approver requestedBy createdBy updatedBy entityId");
 
     res.status(200).json({
-      data: populatedApproval, // ✅ Standard 'data' key
+      data: populatedApproval,
       message: "Approval updated successfully",
       success: true,
     });
@@ -293,6 +294,35 @@ export const updateApproval = async (req, res) => {
         .json({ message: error.message, error: error.errors, success: false });
     res.status(400).json({
       message: "Error updating approval",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+// Add this to your approvalController.js - DELETE approval
+export const deleteApproval = async (req, res) => {
+  try {
+    const approvalId = req.params.id;
+
+    const deletedApproval = await Approval.findByIdAndDelete(approvalId);
+
+    if (!deletedApproval) {
+      return res.status(404).json({
+        message: "Approval not found",
+        success: false,
+      });
+    }
+
+    res.status(200).json({
+      data: deletedApproval,
+      message: "Approval deleted successfully",
+      success: true,
+    });
+  } catch (error) {
+    console.error("[deleteApproval] Error:", error);
+    res.status(500).json({
+      message: "Error deleting approval",
       error: error.message,
       success: false,
     });

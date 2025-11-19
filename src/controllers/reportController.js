@@ -1,9 +1,11 @@
 // src/controllers/reportController.js
 
+import mongoose from "mongoose";
 import AuditSession from "../models/AuditSession.js";
 import Problem from "../models/Problem.js";
 import Report from "../models/Report.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
+import { resolveApproverByBusinessRules } from "../utils/approvalResolver.js";
 
 // ১. Get all reports (ফিল্টারিং, সর্টিং, কাউন্ট এবং স্ট্যান্ডার্ড রেসপন্স সহ)
 export const getAllReports = async (req, res) => {
@@ -521,3 +523,228 @@ export const getReportStatistics = async (req, res) => {
       .json({ message: "Server error", error: error.message, success: false });
   }
 };
+
+
+
+
+
+/**
+ * 10. Submit Report for Approval
+ * Follows your exact controller pattern with proper validation and responses
+ */
+export const submitReportForApproval = async (req, res) => {
+  try {
+    const reportId = req.params.id;
+    const userId = req.user?.id;
+
+    console.log(`📤 Submitting report for approval: ${reportId} by user: ${userId}`);
+
+    // 1. Find and validate report with full population (following your pattern)
+    const report = await Report.findById(reportId)
+      .populate({
+        path: 'auditSession',
+        populate: {
+          path: 'site',
+          populate: {
+            path: 'company'
+          }
+        }
+      });
+
+    if (!report) {
+      return res.status(404).json({ 
+        message: "Report not found", 
+        success: false 
+      });
+    }
+
+    // 2. Business validation - only completed reports can be submitted
+    if (report.reportStatus !== 'completed') {
+      return res.status(400).json({
+        message: "Only completed reports can be submitted for approval",
+        success: false
+      });
+    }
+
+    // 3. Check for existing pending approval (following your validation pattern)
+    const existingApproval = await mongoose.models.Approval.findOne({
+      entityType: "Report",
+      entityId: reportId,
+      approvalStatus: { $in: ["pending", "in-review"] }
+    });
+
+    if (existingApproval) {
+      return res.status(400).json({
+        message: "This report already has a pending approval request",
+        success: false,
+        data: existingApproval
+      });
+    }
+
+    // 4. BUSINESS RULE: Resolve approver
+    
+    const approverId = await resolveApproverByBusinessRules(report, userId);
+
+    // 5. Prepare approval data following your exact pattern
+    const approvalData = {
+      entityType: "Report",
+      entityId: reportId,
+      title: `Approve Report: ${report.title}`,
+      description: `Please review and approve the audit report: "${report.title}". Generated from audit session at ${report.auditSession?.site?.name || 'unknown site'}.`,
+      approver: approverId,
+      priority: "high",
+      deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      requirements: [
+        {
+          description: "Verify report accuracy and completeness",
+          completed: false
+        },
+        {
+          description: "Confirm risk assessments are appropriate", 
+          completed: false
+        },
+        {
+          description: "Validate findings and recommendations",
+          completed: false
+        }
+      ]
+    };
+
+    // 6. Create approval using your existing system
+    const Approval = mongoose.models.Approval;
+    const newApproval = new Approval({
+      ...approvalData,
+      requestedBy: userId,
+      timeline: {
+        requestedAt: new Date(),
+        deadline: approvalData.deadline,
+      },
+      ...createdBy(req), // Using your exact helper
+    });
+
+    // Add initial review history (following your pattern)
+    newApproval.reviewHistory.push({
+      reviewedBy: userId,
+      action: "submitted",
+      comments: "Report submitted for approval",
+      reviewedAt: new Date(),
+    });
+
+    const savedApproval = await newApproval.save();
+
+    // 7. Update report status
+    report.reportStatus = "pending_approval";
+    await report.save();
+
+    // 8. Populate for response (following your pattern)
+    const populatedApproval = await Approval.findById(savedApproval._id)
+      .populate("approver", "name email")
+      .populate("requestedBy", "name email")
+      .populate("createdBy", "name email");
+
+    console.log(`✅ Report submitted for approval successfully: ${reportId}`);
+
+    res.status(200).json({
+      data: { 
+        report: {
+          _id: report._id,
+          title: report.title,
+          reportStatus: report.reportStatus
+        },
+        approval: populatedApproval 
+      },
+      message: "Report submitted for approval successfully",
+      success: true
+    });
+
+  } catch (error) {
+    console.error("[submitReportForApproval] Error:", error);
+    
+    // Follow your exact error handling pattern
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ 
+        message: error.message, 
+        error: error.errors, 
+        success: false 
+      });
+    }
+    
+    res.status(500).json({ 
+      message: "Failed to submit report for approval", 
+      error: error.message, 
+      success: false 
+    });
+  }
+};
+
+
+
+
+
+
+
+
+// Add to reportController.js - Simple approval trigger
+// export const submitReportForApproval = async (req, res) => {
+//   try {
+//     const reportId = req.params.id;
+//     const userId = req.user?.id;
+
+//     // 1. Find the report
+//     const report = await Report.findById(reportId);
+//     if (!report) {
+//       return res.status(404).json({ 
+//         message: "Report not found", 
+//         success: false 
+//       });
+//     }
+
+//     // 2. Update report status
+//     report.reportStatus = "pending_approval";
+//     await report.save();
+
+//     // 3. Find any manager as approver (simple approach)
+//     const approver = await User.findOne({ 
+//       role: { $in: ["admin", "audit_manager"] },
+//       status: "active"
+//     });
+
+//     if (!approver) {
+//       return res.status(400).json({
+//         message: "No approver available",
+//         success: false
+//       });
+//     }
+
+//     // 4. Create approval
+//     const approval = new Approval({
+//       entityType: "Report",
+//       entityId: reportId,
+//       title: `Approval for Report: ${report.title}`,
+//       description: `Please review and approve the audit report`,
+//       approver: approver._id,
+//       requestedBy: userId,
+//       priority: "medium",
+//       timeline: {
+//         requestedAt: new Date(),
+//         deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+//       }
+//     });
+
+//     await approval.save();
+
+//     res.status(200).json({
+//       data: { report, approval },
+//       message: "Report submitted for approval successfully",
+//       success: true
+//     });
+
+//   } catch (error) {
+//     console.error("[submitReportForApproval] Error:", error);
+//     res.status(400).json({
+//       message: "Error submitting report for approval",
+//       error: error.message,
+//       success: false
+//     });
+//   }
+// };

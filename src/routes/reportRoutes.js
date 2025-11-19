@@ -92,4 +92,13 @@ router.delete(
   reportController.deleteReport
 );
 
+
+// POST /api/reports/:id/submit - Submit Report for Approval
+router.post(
+  "/:id/submit",
+  auth,
+  // authorizeRoles(...manageRoles), // Managers/Admins can submit for approval
+  reportController.submitReportForApproval
+);
+
 export default router;
