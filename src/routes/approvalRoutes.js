@@ -100,4 +100,10 @@ router.post(
   approvalController.addComment
 );
 
+// POST /api/approvals/bulk/approve - Bulk approve multiple requests
+router.post('/bulk/approve', auth, approvalController.bulkApproveRequests);
+
+// POST /api/approvals/bulk/reject - Bulk reject multiple requests  
+router.post('/bulk/reject', auth, approvalController.bulkRejectRequests);
+
 export default router;

@@ -605,6 +605,7 @@ export const getMyApprovals = async (req, res) => {
 };
 
 // ৯. Update requirement status (✅ Standard Response, validation, helper fix)
+// In approvalController.js - FIX THE updateRequirement FUNCTION
 export const updateRequirement = async (req, res) => {
   try {
     const { requirementIndex, completed } = req.body;
@@ -635,10 +636,10 @@ export const updateRequirement = async (req, res) => {
       ? userId
       : null;
 
-    // ✅ Manually add to review history
+    // ✅ FIX: Use valid enum value "reviewed" instead of "updated"
     approval.reviewHistory.push({
       reviewedBy: userId,
-      action: "updated", // Custom action
+      action: "reviewed", // ✅ CHANGED from "updated" to "reviewed"
       comments: `Requirement "${
         approval.requirements[requirementIndex].description
       }" marked as ${completed ? "completed" : "incomplete"}.`,
@@ -648,7 +649,7 @@ export const updateRequirement = async (req, res) => {
     const savedApproval = await approval.save();
 
     res.status(200).json({
-      data: savedApproval, // ✅ Standard 'data' key
+      data: savedApproval,
       message: "Requirement updated successfully",
       success: true,
     });
@@ -708,6 +709,208 @@ export const addComment = async (req, res) => {
         .json({ message: error.message, error: error.errors, success: false });
     res.status(400).json({
       message: "Error adding comment",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+
+
+// audit-backend/src/controllers/approvalController.js - ADD BULK METHODS
+
+// 11. Bulk Approve multiple approvals
+export const bulkApproveRequests = async (req, res) => {
+  try {
+    const { approvalIds, comments = '' } = req.body;
+    const userId = req.user?.id;
+
+    if (!approvalIds || !Array.isArray(approvalIds) || approvalIds.length === 0) {
+      return res.status(400).json({
+        message: "Approval IDs array is required",
+        success: false
+      });
+    }
+
+    const results = {
+      successful: [],
+      failed: []
+    };
+
+    // Process each approval
+    for (const approvalId of approvalIds) {
+      try {
+        const approval = await Approval.findById(approvalId);
+        
+        if (!approval) {
+          results.failed.push({
+            approvalId,
+            error: "Approval not found"
+          });
+          continue;
+        }
+
+        // Check permissions
+        if (approval.approver.toString() !== userId?.toString()) {
+          results.failed.push({
+            approvalId,
+            error: "Not authorized to approve this request"
+          });
+          continue;
+        }
+
+        // Check requirements
+        const unmetRequirements = approval.requirements.filter(req => !req.completed);
+        if (unmetRequirements.length > 0) {
+          results.failed.push({
+            approvalId,
+            error: "Requirements not completed",
+            unmetRequirements
+          });
+          continue;
+        }
+
+        // Approve the request
+        approval.approvalStatus = "approved";
+        approval.decision = {
+          decision: "approved",
+          decisionBy: userId,
+          decisionAt: new Date(),
+          comments: comments || "Bulk approved",
+        };
+        approval.timeline.respondedAt = new Date();
+
+        approval.reviewHistory.push({
+          reviewedBy: userId,
+          action: "approved",
+          comments: comments || "Bulk approved",
+          reviewedAt: new Date(),
+        });
+
+        const savedApproval = await approval.save();
+
+        // Update related entity status
+        await updateEntityStatus(approval.entityType, approval.entityId, "active");
+
+        results.successful.push({
+          approvalId,
+          title: approval.title,
+          entityType: approval.entityType
+        });
+
+      } catch (error) {
+        results.failed.push({
+          approvalId,
+          error: error.message
+        });
+      }
+    }
+
+    res.status(200).json({
+      data: results,
+      message: `Bulk approval completed: ${results.successful.length} successful, ${results.failed.length} failed`,
+      success: true,
+    });
+  } catch (error) {
+    console.error("[bulkApproveRequests] Error:", error);
+    res.status(500).json({
+      message: "Error processing bulk approval",
+      error: error.message,
+      success: false,
+    });
+  }
+};
+
+// 12. Bulk Reject multiple approvals
+export const bulkRejectRequests = async (req, res) => {
+  try {
+    const { approvalIds, comments = '' } = req.body;
+    const userId = req.user?.id;
+
+    if (!approvalIds || !Array.isArray(approvalIds) || approvalIds.length === 0) {
+      return res.status(400).json({
+        message: "Approval IDs array is required",
+        success: false
+      });
+    }
+
+    if (!comments.trim()) {
+      return res.status(400).json({
+        message: "Comments are required for bulk rejection",
+        success: false
+      });
+    }
+
+    const results = {
+      successful: [],
+      failed: []
+    };
+
+    for (const approvalId of approvalIds) {
+      try {
+        const approval = await Approval.findById(approvalId);
+        
+        if (!approval) {
+          results.failed.push({
+            approvalId,
+            error: "Approval not found"
+          });
+          continue;
+        }
+
+        if (approval.approver.toString() !== userId?.toString()) {
+          results.failed.push({
+            approvalId,
+            error: "Not authorized to reject this request"
+          });
+          continue;
+        }
+
+        // Reject the request
+        approval.approvalStatus = "rejected";
+        approval.decision = {
+          decision: "rejected",
+          decisionBy: userId,
+          decisionAt: new Date(),
+          comments: comments,
+        };
+        approval.timeline.respondedAt = new Date();
+
+        approval.reviewHistory.push({
+          reviewedBy: userId,
+          action: "rejected",
+          comments: comments,
+          reviewedAt: new Date(),
+        });
+
+        const savedApproval = await approval.save();
+
+        // Update related entity status
+        await updateEntityStatus(approval.entityType, approval.entityId, "inactive");
+
+        results.successful.push({
+          approvalId,
+          title: approval.title,
+          entityType: approval.entityType
+        });
+
+      } catch (error) {
+        results.failed.push({
+          approvalId,
+          error: error.message
+        });
+      }
+    }
+
+    res.status(200).json({
+      data: results,
+      message: `Bulk rejection completed: ${results.successful.length} successful, ${results.failed.length} failed`,
+      success: true,
+    });
+  } catch (error) {
+    console.error("[bulkRejectRequests] Error:", error);
+    res.status(500).json({
+      message: "Error processing bulk rejection",
       error: error.message,
       success: false,
     });
