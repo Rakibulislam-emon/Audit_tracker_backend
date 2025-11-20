@@ -9,6 +9,11 @@ const fixActionSchema = new mongoose.Schema(
       ref: "Problem",
       required: [true, "Related Problem is required."],
     },
+    observation: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Observation",
+      required: false,
+    },
     actionText: {
       type: String,
       required: [true, "Action description is required."],

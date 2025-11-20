@@ -1,8 +1,7 @@
-// src/routes/approvalRoutes.js
+// src/routes/approvalRoutes.js - COMPLETE VERSION
 
 import { Router } from "express";
 import * as approvalController from "../controllers/approvalController.js";
-// ✅ Middleware Imports (without curly braces)
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
 
@@ -16,14 +15,14 @@ const viewRoles = [
   "auditor",
   "compliance_officer",
 ];
-const manageRoles = ["admin", "sysadmin", "audit_manager"]; // Can create/update basic info
+const manageRoles = ["admin", "sysadmin", "audit_manager"];
 const approverRoles = [
   "admin",
   "sysadmin",
   "audit_manager",
   "auditor",
   "compliance_officer",
-]; // Who can be an approver
+];
 const adminOnly = ["admin", "sysadmin"];
 
 // --- Approval Routes ---
@@ -32,81 +31,79 @@ const adminOnly = ["admin", "sysadmin"];
 router.get(
   "/",
   auth,
-  authorizeRoles(...manageRoles), // Only managers/admins see the full list
+  authorizeRoles(...manageRoles),
   approvalController.getAllApprovals
 );
 
 // GET /api/approvals/my-approvals - View user's own queue
-router.get(
-  "/my-approvals",
-  auth, // Any logged-in user can check their queue
-  approvalController.getMyApprovals
-);
+router.get("/my-approvals", auth, approvalController.getMyApprovals);
 
 // GET /api/approvals/:id - View Single
 router.get(
   "/:id",
   auth,
-  authorizeRoles(...viewRoles), // Anyone involved can view
+  authorizeRoles(...viewRoles),
   approvalController.getApprovalById
 );
 
-// POST /api/approvals - Create Approval Request (Triggered by other modules)
+// POST /api/approvals - Create Approval Request
 router.post(
   "/",
   auth,
-  authorizeRoles(...manageRoles), // Only managers/admins can initiate approvals
+  authorizeRoles(...manageRoles),
   approvalController.createApproval
 );
 
-// PUT /api/approvals/:id - Update basic info (e.g., deadline, title)
+// PUT /api/approvals/:id - Update basic info
 router.put(
   "/:id",
   auth,
-  authorizeRoles(...manageRoles), // Only managers/admins can edit
+  authorizeRoles(...manageRoles),
   approvalController.updateApproval
+);
+
+// ✅ ADDED: PATCH /api/approvals/:id - Partial update (if your frontend uses PATCH)
+router.patch(
+  "/:id",
+  auth,
+  authorizeRoles(...manageRoles),
+  approvalController.updateApproval
+);
+
+// ✅ ADDED: DELETE /api/approvals/:id - Delete approval
+router.delete(
+  "/:id",
+  auth,
+  authorizeRoles(...adminOnly),
+  approvalController.deleteApproval
 );
 
 // --- Approval Actions (Specific to Approvers/Users) ---
 
 // POST /api/approvals/:id/approve - Approve
-router.post(
-  "/:id/approve",
-  auth, // Controller verifies if user is the *specific* approver
-  approvalController.approveRequest
-);
+router.post("/:id/approve", auth, approvalController.approveRequest);
 
 // POST /api/approvals/:id/reject - Reject
-router.post(
-  "/:id/reject",
-  auth, // Controller verifies if user is the *specific* approver
-  approvalController.rejectRequest
-);
+router.post("/:id/reject", auth, approvalController.rejectRequest);
 
 // POST /api/approvals/:id/escalate - Escalate
-router.post(
-  "/:id/escalate",
-  auth, // Controller verifies if user is the *specific* approver
-  approvalController.escalateRequest
-);
+router.post("/:id/escalate", auth, approvalController.escalateRequest);
 
 // PATCH /api/approvals/:id/requirement - Update requirement checklist
-router.patch(
-  "/:id/requirement",
-  auth, // Any authenticated user (like requester or approver)
-  approvalController.updateRequirement
-);
+router.patch("/:id/requirement", auth, approvalController.updateRequirement);
 
 // POST /api/approvals/:id/comment - Add comment to history
 router.post(
   "/:id/comment",
   auth,
-  authorizeRoles(...viewRoles), // Anyone who can view can comment
+  authorizeRoles(...viewRoles),
   approvalController.addComment
 );
 
-// Note: No DELETE route added by default as per user's file.
-// If needed, add:
-// router.delete('/:id', auth, authorizeRoles(...adminOnly), approvalController.deleteApproval);
+// POST /api/approvals/bulk/approve - Bulk approve multiple requests
+router.post('/bulk/approve', auth, approvalController.bulkApproveRequests);
+
+// POST /api/approvals/bulk/reject - Bulk reject multiple requests  
+router.post('/bulk/reject', auth, approvalController.bulkRejectRequests);
 
 export default router;
