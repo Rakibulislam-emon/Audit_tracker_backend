@@ -329,12 +329,45 @@ export const deleteApproval = async (req, res) => {
   }
 };
 
+// Add this after the updateEntityStatus function and before getAllApprovals
+
+// Industry-standard permission check
+const canUserApprove = (approval, user) => {
+  // RULE 1: Assigned approver can always act
+  const isAssignedApprover =
+    approval.approver.toString() === user.id?.toString() ||
+    approval.approver.toString() === user._id?.toString();
+
+  if (isAssignedApprover) {
+    return true;
+  }
+
+  // RULE 2: Escalation path for overdue approvals (manager+ roles)
+  const isOverdue =
+    approval.timeline?.deadline &&
+    new Date() > new Date(approval.timeline.deadline);
+  if (isOverdue && ["admin", "sysadmin", "audit_manager"].includes(user.role)) {
+    console.log(`✅ Escalation approval by ${user.role} for overdue request`);
+    return true;
+  }
+
+  // RULE 3: Emergency override for critical items (sysadmin only)
+  if (approval.priority === "critical" && user.role === "sysadmin") {
+    console.log(`✅ Emergency override by sysadmin for critical approval`);
+    return true;
+  }
+
+  return false;
+};
+
 // ৫. Approve an approval request (✅ Standard Response, validation, helper fix)
+// ৫. Approve an approval request - UPDATED WITH INDUSTRY LOGIC
 export const approveRequest = async (req, res) => {
   try {
     const { comments } = req.body;
     const approvalId = req.params.id;
     const userId = req.user?.id;
+    const userRole = req.user?.role; // ADD THIS LINE
 
     const approval = await Approval.findById(approvalId);
     if (!approval)
@@ -342,7 +375,10 @@ export const approveRequest = async (req, res) => {
         .status(404)
         .json({ message: "Approval not found", success: false });
 
-    if (approval.approver.toString() !== userId?.toString()) {
+    // ✅ REPLACE THIS CHECK with the new permission logic
+    // OLD: if (approval.approver.toString() !== userId?.toString()) {
+    // NEW:
+    if (!canUserApprove(approval, { id: userId, role: userRole })) {
       return res.status(403).json({
         message: "You are not authorized to approve this request",
         success: false,
@@ -369,11 +405,15 @@ export const approveRequest = async (req, res) => {
     };
     approval.timeline.respondedAt = new Date();
 
-    // ✅ Manually add to review history
+    // Add context to comments for audit trail
+    const isAssignedApprover =
+      approval.approver.toString() === userId?.toString();
+    const actionContext = isAssignedApprover ? "" : ` (${userRole} override)`;
+
     approval.reviewHistory.push({
       reviewedBy: userId,
       action: "approved",
-      comments: comments || "Request approved",
+      comments: `${comments || "Request approved"}${actionContext}`,
       reviewedAt: new Date(),
     });
 
@@ -391,7 +431,7 @@ export const approveRequest = async (req, res) => {
       .populate("updatedBy", "name email");
 
     res.status(200).json({
-      data: savedApproval, // ✅ Standard 'data' key
+      data: savedApproval,
       message: "Approval request approved successfully",
       success: true,
     });
@@ -409,12 +449,13 @@ export const approveRequest = async (req, res) => {
   }
 };
 
-// ৬. Reject an approval request (✅ Standard Response, validation, helper fix)
+// ৬. Reject an approval request - UPDATED WITH INDUSTRY LOGIC
 export const rejectRequest = async (req, res) => {
   try {
-    const { comments } = req.body; // 'reason' was in your req, but only 'comments' seems used
+    const { comments } = req.body;
     const approvalId = req.params.id;
     const userId = req.user?.id;
+    const userRole = req.user?.role; // ADD THIS LINE
 
     if (!comments) {
       return res.status(400).json({
@@ -429,7 +470,10 @@ export const rejectRequest = async (req, res) => {
         .status(404)
         .json({ message: "Approval not found", success: false });
 
-    if (approval.approver.toString() !== userId?.toString()) {
+    // ✅ REPLACE THIS CHECK with the new permission logic
+    // OLD: if (approval.approver.toString() !== userId?.toString()) {
+    // NEW:
+    if (!canUserApprove(approval, { id: userId, role: userRole })) {
       return res.status(403).json({
         message: "You are not authorized to reject this request",
         success: false,
@@ -445,11 +489,15 @@ export const rejectRequest = async (req, res) => {
     };
     approval.timeline.respondedAt = new Date();
 
-    // ✅ Manually add to review history
+    // Add context to comments for audit trail
+    const isAssignedApprover =
+      approval.approver.toString() === userId?.toString();
+    const actionContext = isAssignedApprover ? "" : ` (${userRole} override)`;
+
     approval.reviewHistory.push({
       reviewedBy: userId,
       action: "rejected",
-      comments: comments,
+      comments: `${comments}${actionContext}`,
       reviewedAt: new Date(),
     });
 
@@ -471,7 +519,7 @@ export const rejectRequest = async (req, res) => {
       .populate("updatedBy", "name email");
 
     res.status(200).json({
-      data: savedApproval, // ✅ Standard 'data' key
+      data: savedApproval,
       message: "Approval request rejected",
       success: true,
     });
@@ -713,37 +761,39 @@ export const addComment = async (req, res) => {
   }
 };
 
-
-
 // audit-backend/src/controllers/approvalController.js - ADD BULK METHODS
 
 // 11. Bulk Approve multiple approvals
 export const bulkApproveRequests = async (req, res) => {
   try {
-    const { approvalIds, comments = '' } = req.body;
+    const { approvalIds, comments = "" } = req.body;
     const userId = req.user?.id;
 
-    if (!approvalIds || !Array.isArray(approvalIds) || approvalIds.length === 0) {
+    if (
+      !approvalIds ||
+      !Array.isArray(approvalIds) ||
+      approvalIds.length === 0
+    ) {
       return res.status(400).json({
         message: "Approval IDs array is required",
-        success: false
+        success: false,
       });
     }
 
     const results = {
       successful: [],
-      failed: []
+      failed: [],
     };
 
     // Process each approval
     for (const approvalId of approvalIds) {
       try {
         const approval = await Approval.findById(approvalId);
-        
+
         if (!approval) {
           results.failed.push({
             approvalId,
-            error: "Approval not found"
+            error: "Approval not found",
           });
           continue;
         }
@@ -752,18 +802,20 @@ export const bulkApproveRequests = async (req, res) => {
         if (approval.approver.toString() !== userId?.toString()) {
           results.failed.push({
             approvalId,
-            error: "Not authorized to approve this request"
+            error: "Not authorized to approve this request",
           });
           continue;
         }
 
         // Check requirements
-        const unmetRequirements = approval.requirements.filter(req => !req.completed);
+        const unmetRequirements = approval.requirements.filter(
+          (req) => !req.completed
+        );
         if (unmetRequirements.length > 0) {
           results.failed.push({
             approvalId,
             error: "Requirements not completed",
-            unmetRequirements
+            unmetRequirements,
           });
           continue;
         }
@@ -788,18 +840,21 @@ export const bulkApproveRequests = async (req, res) => {
         const savedApproval = await approval.save();
 
         // Update related entity status
-        await updateEntityStatus(approval.entityType, approval.entityId, "active");
+        await updateEntityStatus(
+          approval.entityType,
+          approval.entityId,
+          "active"
+        );
 
         results.successful.push({
           approvalId,
           title: approval.title,
-          entityType: approval.entityType
+          entityType: approval.entityType,
         });
-
       } catch (error) {
         results.failed.push({
           approvalId,
-          error: error.message
+          error: error.message,
         });
       }
     }
@@ -822,36 +877,40 @@ export const bulkApproveRequests = async (req, res) => {
 // 12. Bulk Reject multiple approvals
 export const bulkRejectRequests = async (req, res) => {
   try {
-    const { approvalIds, comments = '' } = req.body;
+    const { approvalIds, comments = "" } = req.body;
     const userId = req.user?.id;
 
-    if (!approvalIds || !Array.isArray(approvalIds) || approvalIds.length === 0) {
+    if (
+      !approvalIds ||
+      !Array.isArray(approvalIds) ||
+      approvalIds.length === 0
+    ) {
       return res.status(400).json({
         message: "Approval IDs array is required",
-        success: false
+        success: false,
       });
     }
 
     if (!comments.trim()) {
       return res.status(400).json({
         message: "Comments are required for bulk rejection",
-        success: false
+        success: false,
       });
     }
 
     const results = {
       successful: [],
-      failed: []
+      failed: [],
     };
 
     for (const approvalId of approvalIds) {
       try {
         const approval = await Approval.findById(approvalId);
-        
+
         if (!approval) {
           results.failed.push({
             approvalId,
-            error: "Approval not found"
+            error: "Approval not found",
           });
           continue;
         }
@@ -859,7 +918,7 @@ export const bulkRejectRequests = async (req, res) => {
         if (approval.approver.toString() !== userId?.toString()) {
           results.failed.push({
             approvalId,
-            error: "Not authorized to reject this request"
+            error: "Not authorized to reject this request",
           });
           continue;
         }
@@ -884,18 +943,21 @@ export const bulkRejectRequests = async (req, res) => {
         const savedApproval = await approval.save();
 
         // Update related entity status
-        await updateEntityStatus(approval.entityType, approval.entityId, "inactive");
+        await updateEntityStatus(
+          approval.entityType,
+          approval.entityId,
+          "inactive"
+        );
 
         results.successful.push({
           approvalId,
           title: approval.title,
-          entityType: approval.entityType
+          entityType: approval.entityType,
         });
-
       } catch (error) {
         results.failed.push({
           approvalId,
-          error: error.message
+          error: error.message,
         });
       }
     }
