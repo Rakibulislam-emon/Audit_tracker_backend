@@ -525,9 +525,6 @@ export const getReportStatistics = async (req, res) => {
 };
 
 
-
-
-
 /**
  * 10. Submit Report for Approval
  * Follows your exact controller pattern with proper validation and responses
@@ -536,10 +533,10 @@ export const submitReportForApproval = async (req, res) => {
   try {
     const reportId = req.params.id;
     const userId = req.user?.id;
+    const userRole = req.user?.role;
 
-    console.log(`📤 Submitting report for approval: ${reportId} by user: ${userId}`);
+    console.log(`📤 Submitting report for approval: ${reportId} by user: ${userId} (${userRole})`);
 
-    // 1. Find and validate report with full population (following your pattern)
     const report = await Report.findById(reportId)
       .populate({
         path: 'auditSession',
@@ -558,7 +555,6 @@ export const submitReportForApproval = async (req, res) => {
       });
     }
 
-    // 2. Business validation - only completed reports can be submitted
     if (report.reportStatus !== 'completed') {
       return res.status(400).json({
         message: "Only completed reports can be submitted for approval",
@@ -566,7 +562,6 @@ export const submitReportForApproval = async (req, res) => {
       });
     }
 
-    // 3. Check for existing pending approval (following your validation pattern)
     const existingApproval = await mongoose.models.Approval.findOne({
       entityType: "Report",
       entityId: reportId,
@@ -581,11 +576,10 @@ export const submitReportForApproval = async (req, res) => {
       });
     }
 
-    // 4. BUSINESS RULE: Resolve approver
-    
-    const approverId = await resolveApproverByBusinessRules(report, userId);
+    // ✅ ULTIMATE FIX: Use the updated resolver
+    const approverId = await resolveApproverByBusinessRules(report, userId, req);
 
-    // 5. Prepare approval data following your exact pattern
+    // Prepare approval data
     const approvalData = {
       entityType: "Report",
       entityId: reportId,
@@ -610,7 +604,6 @@ export const submitReportForApproval = async (req, res) => {
       ]
     };
 
-    // 6. Create approval using your existing system
     const Approval = mongoose.models.Approval;
     const newApproval = new Approval({
       ...approvalData,
@@ -619,10 +612,9 @@ export const submitReportForApproval = async (req, res) => {
         requestedAt: new Date(),
         deadline: approvalData.deadline,
       },
-      ...createdBy(req), // Using your exact helper
+      ...createdBy(req),
     });
 
-    // Add initial review history (following your pattern)
     newApproval.reviewHistory.push({
       reviewedBy: userId,
       action: "submitted",
@@ -632,11 +624,9 @@ export const submitReportForApproval = async (req, res) => {
 
     const savedApproval = await newApproval.save();
 
-    // 7. Update report status
     report.reportStatus = "pending_approval";
     await report.save();
 
-    // 8. Populate for response (following your pattern)
     const populatedApproval = await Approval.findById(savedApproval._id)
       .populate("approver", "name email")
       .populate("requestedBy", "name email")
@@ -660,7 +650,6 @@ export const submitReportForApproval = async (req, res) => {
   } catch (error) {
     console.error("[submitReportForApproval] Error:", error);
     
-    // Follow your exact error handling pattern
     if (error.name === "ValidationError") {
       return res.status(400).json({ 
         message: error.message, 
