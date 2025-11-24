@@ -15,7 +15,7 @@
 //   "sysadmin",
 //   "manager",
 //   "auditor",
-//   "compliance_officer",
+//   "complianceOfficer",
 // ];
 // const manageRoles = ["admin", "sysadmin", "manager"];
 // const adminOnly = ["admin", "sysadmin"];
@@ -107,10 +107,10 @@
 // src/routes/reportRoutes.js
 
 import { Router } from "express";
+import { can } from "../config/permissions.js";
 import * as reportController from "../controllers/reportController.js";
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
-import { can } from "../config/permissions.js";
 
 const router = Router();
 

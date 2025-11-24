@@ -14,7 +14,6 @@ import problemRoutes from "./problemRoutes.js";
 import programRoutes from "./programRoutes.js";
 import proofRoutes from "./proofRoutes.js";
 import questionRoutes from "./questionRoutes.js";
-import questionRuleLinkRoutes from "./questionRuleLinkRoutes.js";
 import reportRoutes from "./reportRoutes.js";
 import ruleRoutes from "./ruleRoutes.js";
 import scheduleRoutes from "./scheduleRoutes.js";
@@ -22,8 +21,10 @@ import siteRoutes from "./siteRoutes.js";
 import teamRoutes from "./teamRoutes.js";
 import templateRoutes from "./templateRoutes.js";
 import userRoutes from "./userRoutes.js";
+import dashboardRoutes from "./dashboardRoutes.js";
 
 router.use("/api/users", userRoutes);
+router.use("/api/dashboard", dashboardRoutes);
 router.use("/api/groups", groupRoutes);
 router.use("/api/companies", companyRoutes);
 router.use("/api/sites", siteRoutes);
@@ -45,7 +46,7 @@ router.use("/api/reports", reportRoutes);
 
 router.use("/api/approvals", approvalRoutes);
 
-// router.use("/api/metrics", metricRoutes);
+router.use("/api/metrics", metricRoutes);
 
-// router.use("/api/question-rule-links", questionRuleLinkRoutes);
+
 export default router;
