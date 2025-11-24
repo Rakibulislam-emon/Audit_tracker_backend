@@ -61,6 +61,14 @@ const auditSessionSchema = new mongoose.Schema(
       ref: "Schedule",
       required: [true, "Schedule is required."],
     },
+    auditor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    leadAuditor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
     ...commonFields, // status (active/inactive), createdBy, updatedBy
   },
   {

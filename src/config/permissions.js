@@ -3,7 +3,7 @@
 export const ROLES = {
   SYSADMIN: "sysadmin",
   ADMIN: "admin",
-  COMPLIANCE_OFFICER: "compliance_officer",
+  COMPLIANCE_OFFICER: "complianceOfficer",
   MANAGER: "manager",
   AUDITOR: "auditor",
 };

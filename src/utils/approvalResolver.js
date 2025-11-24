@@ -25,7 +25,7 @@ export const resolveApproverByBusinessRules = async (
     // Get potential approvers for other roles (auditors, compliance officers, etc.)
     const potentialApprovers = await User.find({
       role: {
-        $in: ["manager", "compliance_officer", "admin", "sysadmin"],
+        $in: ["manager", "complianceOfficer", "admin", "sysadmin"],
       },
       isActive: true,
     }).sort({ createdAt: -1 });
@@ -46,7 +46,7 @@ export const resolveApproverByBusinessRules = async (
     }
 
     const complianceOfficer = potentialApprovers.find(
-      (user) => user.role === "compliance_officer"
+      (user) => user.role === "complianceOfficer"
     );
     if (complianceOfficer) {
       console.log(`✅ Using compliance officer: ${complianceOfficer.name}`);
