@@ -4,17 +4,15 @@ import { Router } from "express";
 import * as programController from "../controllers/programController.js";
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
+import { can } from "../config/permissions.js";
 
 const router = Router();
-
-// --- Program Routes ---
-// Adjust roles based on your dynamicConfig permissions for 'programs'
 
 // GET /api/programs - View All
 router.get(
   "/",
   auth,
-  authorizeRoles("admin", "sysadmin", "audit_manager", "auditor"), // Example roles
+  authorizeRoles(...can("PROGRAM", "VIEW")),
   programController.getAllPrograms
 );
 
@@ -22,7 +20,7 @@ router.get(
 router.get(
   "/:id",
   auth,
-  authorizeRoles("admin", "sysadmin", "audit_manager", "auditor"), // Example roles
+  authorizeRoles(...can("PROGRAM", "VIEW")),
   programController.getProgramById
 );
 
@@ -30,15 +28,15 @@ router.get(
 router.post(
   "/",
   auth,
-  authorizeRoles("admin", "sysadmin", "audit_manager"), // Example roles
+  authorizeRoles(...can("PROGRAM", "CREATE")),
   programController.createProgram
 );
 
-// PUT /api/programs/:id - Update
+// PATCH /api/programs/:id - Update
 router.patch(
   "/:id",
   auth,
-  authorizeRoles("admin", "sysadmin", "audit_manager"), // Example roles
+  authorizeRoles(...can("PROGRAM", "UPDATE")),
   programController.updateProgram
 );
 
@@ -46,7 +44,7 @@ router.patch(
 router.delete(
   "/:id",
   auth,
-  authorizeRoles("admin", "sysadmin"), // Example roles
+  authorizeRoles(...can("PROGRAM", "DELETE")),
   programController.deleteProgram
 );
 

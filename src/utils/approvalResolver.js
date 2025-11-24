@@ -15,7 +15,7 @@ export const resolveApproverByBusinessRules = async (
     );
 
     // ULTIMATE FIX: Always allow admin/manager to handle their own approvals
-    if (["admin", "sysadmin", "audit_manager"].includes(userRole)) {
+    if (["admin", "sysadmin", "manager"].includes(userRole)) {
       console.log(
         `✅ Admin/Manager handling approval: ${requestedByUserId} (${userRole})`
       );
@@ -25,7 +25,7 @@ export const resolveApproverByBusinessRules = async (
     // Get potential approvers for other roles (auditors, compliance officers, etc.)
     const potentialApprovers = await User.find({
       role: {
-        $in: ["audit_manager", "compliance_officer", "admin", "sysadmin"],
+        $in: ["manager", "compliance_officer", "admin", "sysadmin"],
       },
       isActive: true,
     }).sort({ createdAt: -1 });
@@ -38,7 +38,7 @@ export const resolveApproverByBusinessRules = async (
 
     // Priority rules for non-admin users
     const auditManager = potentialApprovers.find(
-      (user) => user.role === "audit_manager"
+      (user) => user.role === "manager"
     );
     if (auditManager) {
       console.log(`✅ Using audit manager: ${auditManager.name}`);

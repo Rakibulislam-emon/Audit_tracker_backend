@@ -1,6 +1,7 @@
 // src/routes/siteRoutes.js
 
 import { Router } from "express";
+import { can } from "../config/permissions.js";
 import * as siteController from "../controllers/siteController.js";
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
@@ -10,31 +11,31 @@ const router = Router();
 router.get(
   "/",
   auth,
-  authorizeRoles("admin", "sysadmin"),
+  authorizeRoles(...can("SITE", "VIEW")),
   siteController.getAllSites
 );
 router.get(
   "/:id",
   auth,
-  authorizeRoles("admin", "sysadmin"),
+  authorizeRoles(...can("SITE", "VIEW")),
   siteController.getSiteById
 );
 router.post(
   "/",
   auth,
-  authorizeRoles("admin", "sysadmin"),
+  authorizeRoles(...can("SITE", "CREATE")),
   siteController.createSite
 );
 router.patch(
   "/:id",
   auth,
-  authorizeRoles("admin", "sysadmin"),
+  authorizeRoles(...can("SITE", "UPDATE")),
   siteController.updateSite
 );
 router.delete(
   "/:id",
   auth,
-  authorizeRoles("admin", "sysadmin"),
+  authorizeRoles(...can("SITE", "DELETE")),
   siteController.deleteSite
 );
 

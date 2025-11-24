@@ -1,50 +1,50 @@
 // src/routes/templateRoutes.js
 
 import { Router } from "express";
+import { can } from "../config/permissions.js";
 import * as templateController from "../controllers/templateController.js";
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
 
 const router = Router();
 
-// GET /api/templates - View All (requires view permission)
+// GET /api/templates - View All
 router.get(
   "/",
-  auth, // Check if logged in
-  authorizeRoles("admin", "sysadmin", "audit_manager", "auditor"), // Check roles
+  auth,
+  authorizeRoles(...can("TEMPLATE", "VIEW")),
   templateController.getAllTemplates
 );
 
-// GET /api/templates/:id - View Single (requires view permission)
+// GET /api/templates/:id - View Single
 router.get(
   "/:id",
   auth,
-  authorizeRoles("admin", "sysadmin", "audit_manager", "auditor"),
+  authorizeRoles(...can("TEMPLATE", "VIEW")),
   templateController.getTemplateById
 );
 
-// POST /api/templates - Create (requires create permission)
+// POST /api/templates - Create
 router.post(
   "/",
   auth,
-  authorizeRoles("admin", "sysadmin", "audit_manager"), // Only these roles can create
+  authorizeRoles(...can("TEMPLATE", "CREATE")),
   templateController.createTemplate
 );
 
-// PUT /api/templates/:id - Update (requires edit permission)
-// Note: PUT replaces the entire resource, PATCH updates partially. Usually PUT is used here.
+// PATCH /api/templates/:id - Update
 router.patch(
   "/:id",
   auth,
-  authorizeRoles("admin", "sysadmin", "audit_manager"), // Only these roles can edit
+  authorizeRoles(...can("TEMPLATE", "UPDATE")),
   templateController.updateTemplate
 );
 
-// DELETE /api/templates/:id - Delete (requires delete permission)
+// DELETE /api/templates/:id - Delete
 router.delete(
   "/:id",
   auth,
-  authorizeRoles("admin", "sysadmin"), // Only these roles can delete
+  authorizeRoles(...can("TEMPLATE", "DELETE")),
   templateController.deleteTemplate
 );
 

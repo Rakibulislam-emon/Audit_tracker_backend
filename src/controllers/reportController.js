@@ -524,7 +524,6 @@ export const getReportStatistics = async (req, res) => {
   }
 };
 
-
 /**
  * 10. Submit Report for Approval
  * Follows your exact controller pattern with proper validation and responses
@@ -535,73 +534,82 @@ export const submitReportForApproval = async (req, res) => {
     const userId = req.user?.id;
     const userRole = req.user?.role;
 
-    console.log(`📤 Submitting report for approval: ${reportId} by user: ${userId} (${userRole})`);
+    console.log(
+      `📤 Submitting report for approval: ${reportId} by user: ${userId} (${userRole})`
+    );
 
-    const report = await Report.findById(reportId)
-      .populate({
-        path: 'auditSession',
+    const report = await Report.findById(reportId).populate({
+      path: "auditSession",
+      populate: {
+        path: "site",
         populate: {
-          path: 'site',
-          populate: {
-            path: 'company'
-          }
-        }
-      });
+          path: "company",
+        },
+      },
+    });
 
     if (!report) {
-      return res.status(404).json({ 
-        message: "Report not found", 
-        success: false 
+      return res.status(404).json({
+        message: "Report not found",
+        success: false,
       });
     }
 
-    if (report.reportStatus !== 'completed') {
+    if (report.reportStatus !== "completed") {
       return res.status(400).json({
         message: "Only completed reports can be submitted for approval",
-        success: false
+        success: false,
       });
     }
 
     const existingApproval = await mongoose.models.Approval.findOne({
       entityType: "Report",
       entityId: reportId,
-      approvalStatus: { $in: ["pending", "in-review"] }
+      approvalStatus: { $in: ["pending", "in-review"] },
     });
 
     if (existingApproval) {
       return res.status(400).json({
         message: "This report already has a pending approval request",
         success: false,
-        data: existingApproval
+        data: existingApproval,
       });
     }
 
     // ✅ ULTIMATE FIX: Use the updated resolver
-    const approverId = await resolveApproverByBusinessRules(report, userId, req);
+    const approverId = await resolveApproverByBusinessRules(
+      report,
+      userId,
+      req
+    );
 
     // Prepare approval data
     const approvalData = {
       entityType: "Report",
       entityId: reportId,
       title: `Approve Report: ${report.title}`,
-      description: `Please review and approve the audit report: "${report.title}". Generated from audit session at ${report.auditSession?.site?.name || 'unknown site'}.`,
+      description: `Please review and approve the audit report: "${
+        report.title
+      }". Generated from audit session at ${
+        report.auditSession?.site?.name || "unknown site"
+      }.`,
       approver: approverId,
       priority: "high",
       deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
       requirements: [
         {
           description: "Verify report accuracy and completeness",
-          completed: false
+          completed: false,
         },
         {
-          description: "Confirm risk assessments are appropriate", 
-          completed: false
+          description: "Confirm risk assessments are appropriate",
+          completed: false,
         },
         {
           description: "Validate findings and recommendations",
-          completed: false
-        }
-      ]
+          completed: false,
+        },
+      ],
     };
 
     const Approval = mongoose.models.Approval;
@@ -635,43 +643,35 @@ export const submitReportForApproval = async (req, res) => {
     console.log(`✅ Report submitted for approval successfully: ${reportId}`);
 
     res.status(200).json({
-      data: { 
+      data: {
         report: {
           _id: report._id,
           title: report.title,
-          reportStatus: report.reportStatus
+          reportStatus: report.reportStatus,
         },
-        approval: populatedApproval 
+        approval: populatedApproval,
       },
       message: "Report submitted for approval successfully",
-      success: true
+      success: true,
     });
-
   } catch (error) {
     console.error("[submitReportForApproval] Error:", error);
-    
+
     if (error.name === "ValidationError") {
-      return res.status(400).json({ 
-        message: error.message, 
-        error: error.errors, 
-        success: false 
+      return res.status(400).json({
+        message: error.message,
+        error: error.errors,
+        success: false,
       });
     }
-    
-    res.status(500).json({ 
-      message: "Failed to submit report for approval", 
-      error: error.message, 
-      success: false 
+
+    res.status(500).json({
+      message: "Failed to submit report for approval",
+      error: error.message,
+      success: false,
     });
   }
 };
-
-
-
-
-
-
-
 
 // Add to reportController.js - Simple approval trigger
 // export const submitReportForApproval = async (req, res) => {
@@ -682,9 +682,9 @@ export const submitReportForApproval = async (req, res) => {
 //     // 1. Find the report
 //     const report = await Report.findById(reportId);
 //     if (!report) {
-//       return res.status(404).json({ 
-//         message: "Report not found", 
-//         success: false 
+//       return res.status(404).json({
+//         message: "Report not found",
+//         success: false
 //       });
 //     }
 
@@ -693,8 +693,8 @@ export const submitReportForApproval = async (req, res) => {
 //     await report.save();
 
 //     // 3. Find any manager as approver (simple approach)
-//     const approver = await User.findOne({ 
-//       role: { $in: ["admin", "audit_manager"] },
+//     const approver = await User.findOne({
+//       role: { $in: ["admin", "manager"] },
 //       status: "active"
 //     });
 
