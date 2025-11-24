@@ -1,28 +1,18 @@
 // src/routes/proofRoutes.js
 import { Router } from "express";
+import { can } from "../config/permissions.js";
 import * as proofController from "../controllers/proofController.js";
-// ✅ Middleware Imports (without curly braces)
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
-import upload from "../middleware/upload.js"; // Assuming your multer/cloudinary upload middleware is here
+import upload from "../middleware/upload.js";
 
 const router = Router();
-
-// --- Proof Routes ---
-// Adjust roles as needed
 
 // GET /api/proofs - View All Proofs
 router.get(
   "/",
   auth,
-  // Who can view proofs? Probably anyone involved in the audit.
-  authorizeRoles(
-    "admin",
-    "sysadmin",
-    "audit_manager",
-    "auditor",
-    "compliance_officer"
-  ),
+  authorizeRoles(...can("PROOF", "VIEW")),
   proofController.getAllProofs
 );
 
@@ -30,13 +20,7 @@ router.get(
 router.get(
   "/:id",
   auth,
-  authorizeRoles(
-    "admin",
-    "sysadmin",
-    "audit_manager",
-    "auditor",
-    "compliance_officer"
-  ),
+  authorizeRoles(...can("PROOF", "VIEW")),
   proofController.getProofById
 );
 
@@ -44,27 +28,24 @@ router.get(
 router.post(
   "/",
   auth,
-  // Who can upload proof? Auditors, Owners of FixActions, Managers?
-  authorizeRoles("admin", "sysadmin", "audit_manager", "auditor"), // Broad access initially
-  upload.single("file"), // ✅ Use multer middleware to handle single file upload named 'file'
+  authorizeRoles(...can("PROOF", "CREATE")),
+  upload.single("file"),
   proofController.uploadProof
 );
 
 // PATCH /api/proofs/:id - Update Proof Caption/Status
 router.patch(
-  // Use PATCH for partial updates
   "/:id",
   auth,
-  // Who can update caption/status? Uploader? Manager?
-  authorizeRoles("admin", "sysadmin", "audit_manager"), // More restricted update?
+  authorizeRoles(...can("PROOF", "UPDATE")),
   proofController.updateProof
 );
 
-// DELETE /api/proofs/:id - Delete Proof (Restricted)
+// DELETE /api/proofs/:id - Delete Proof
 router.delete(
   "/:id",
   auth,
-  authorizeRoles("admin", "sysadmin", "audit_manager"), // Manager/Admin can delete proof
+  authorizeRoles(...can("PROOF", "DELETE")),
   proofController.deleteProof
 );
 

@@ -4,37 +4,38 @@ import { Router } from "express";
 import * as checkTypeController from "../controllers/checkTypeController.js";
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
+import { can } from "../config/permissions.js";
 
 const router = Router();
 
 router.get(
   "/",
   auth,
-  authorizeRoles("admin"),
+  authorizeRoles(...can("CHECK_TYPE", "VIEW")),
   checkTypeController.getAllCheckTypes
 );
 router.get(
   "/:id",
   auth,
-  authorizeRoles("admin"),
+  authorizeRoles(...can("CHECK_TYPE", "VIEW")),
   checkTypeController.getCheckTypeById
 );
 router.post(
   "/",
   auth,
-  authorizeRoles("admin"),
+  authorizeRoles(...can("CHECK_TYPE", "CREATE")),
   checkTypeController.createCheckType
 );
 router.patch(
   "/:id",
   auth,
-  authorizeRoles("admin"),
+  authorizeRoles(...can("CHECK_TYPE", "UPDATE")),
   checkTypeController.updateCheckType
 );
 router.delete(
   "/:id",
   auth,
-  authorizeRoles("admin"),
+  authorizeRoles(...can("CHECK_TYPE", "DELETE")),
   checkTypeController.deleteCheckType
 );
 

@@ -45,7 +45,7 @@ router.use("/api/reports", reportRoutes);
 
 router.use("/api/approvals", approvalRoutes);
 
-router.use("/api/metrics", metricRoutes);
+// router.use("/api/metrics", metricRoutes);
 
-router.use("/api/question-rule-links", questionRuleLinkRoutes);
+// router.use("/api/question-rule-links", questionRuleLinkRoutes);
 export default router;

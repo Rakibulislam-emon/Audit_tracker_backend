@@ -6,32 +6,30 @@ import {
   logoutUser,
   registerUser,
   updateUser,
+  // getCurrentUser,
 } from "../controllers/userController.js";
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
+import { can } from "../config/permissions.js";
 
 const router = express.Router();
 
-router.get("/me", auth, (req, res) => {
-  res.json({
-    _id: req.user._id,
-    name: req.user.name,
-    email: req.user.email,
-    role: req.user.role,
-  });
-});
-router.get("/", auth, authorizeRoles("admin", "sysadmin"), getAllUsers);
-
-router.post(
-  "/",
+// router.get("/me", auth, getCurrentUser);
+router.get("/", auth, authorizeRoles(...can("USER", "VIEW")), getAllUsers);
+router.post("/", auth, authorizeRoles(...can("USER", "CREATE")), registerUser);
+router.post("/login", loginUser);
+router.patch(
+  "/:id",
   auth,
-  authorizeRoles("admin", "sysadmin"),
-  registerUser
+  authorizeRoles(...can("USER", "UPDATE")),
+  updateUser
+);
+router.post("/logout", auth, logoutUser);
+router.delete(
+  "/:id",
+  auth,
+  authorizeRoles(...can("USER", "DELETE")),
+  deleteUser
 );
 
-router.post("/login", loginUser);
-router.patch("/:id", auth, authorizeRoles("admin", "sysadmin"), updateUser);
-router.post("/logout", logoutUser);
-
-router.delete("/:id", auth, authorizeRoles("admin", "sysadmin"), deleteUser);
 export default router;

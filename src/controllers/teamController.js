@@ -24,8 +24,9 @@ export const getAllTeams = async (req, res) => {
     if (search && !roleInTeam) {
       const searchRegex = { $regex: search, $options: "i" };
       query.roleInTeam = searchRegex; // Simple search on role text
+      
     }
-
+    
     console.log("[getAllTeams] Final Mongoose Query:", JSON.stringify(query));
 
     // Step 5: Find data, populate relationships, and sort

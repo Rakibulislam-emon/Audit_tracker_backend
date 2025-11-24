@@ -346,7 +346,7 @@ const canUserApprove = (approval, user) => {
   const isOverdue =
     approval.timeline?.deadline &&
     new Date() > new Date(approval.timeline.deadline);
-  if (isOverdue && ["admin", "sysadmin", "audit_manager"].includes(user.role)) {
+  if (isOverdue && ["admin", "sysadmin", "manager"].includes(user.role)) {
     console.log(`✅ Escalation approval by ${user.role} for overdue request`);
     return true;
   }

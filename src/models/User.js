@@ -26,13 +26,7 @@ const UserSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: [
-        "admin",
-        "audit_manager",
-        "auditor",
-        "compliance_officer",
-        "sysadmin",
-      ],
+      enum: ["admin", "manager", "auditor", "compliance_officer", "sysadmin"],
       default: "auditor",
       required: true,
     },

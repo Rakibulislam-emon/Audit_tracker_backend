@@ -1,26 +1,26 @@
 // src/routes/groupRoutes.js
 
 import { Router } from "express";
-// import * as groupController from "../controllers/groupController.js";
+import { can } from "../config/permissions.js";
+import { createGroup, deleteGroup, getAllGroups, updateGroup } from "../controllers/groupController.js";
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
-import { getAllGroups, createGroup, deleteGroup, updateGroup } from "../controllers/groupController.js";
 
 const router = Router();
 
 router.get(
   "/",
   auth,
-  authorizeRoles("admin"),
+  authorizeRoles(...can("GROUP", "VIEW")),
   getAllGroups
 );
 
 // router.get("/:id", groupController.getGroupById);
 
-router.post("/",auth, authorizeRoles("admin"), createGroup);
+router.post("/", auth, authorizeRoles(...can("GROUP", "CREATE")), createGroup);
 
-router.patch("/:id",auth, authorizeRoles("admin"), updateGroup);
+router.patch("/:id", auth, authorizeRoles(...can("GROUP", "UPDATE")), updateGroup);
 
-router.delete("/:id",auth, authorizeRoles("admin"), deleteGroup);
+router.delete("/:id", auth, authorizeRoles(...can("GROUP", "DELETE")), deleteGroup);
 
 export default router;

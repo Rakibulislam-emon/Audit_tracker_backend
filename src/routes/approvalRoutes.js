@@ -1,37 +1,18 @@
-// src/routes/approvalRoutes.js - COMPLETE VERSION
+// src/routes/approvalRoutes.js
 
 import { Router } from "express";
+import { can } from "../config/permissions.js";
 import * as approvalController from "../controllers/approvalController.js";
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
 
 const router = Router();
 
-// --- Define Roles for Readability ---
-const viewRoles = [
-  "admin",
-  "sysadmin",
-  "audit_manager",
-  "auditor",
-  "compliance_officer",
-];
-const manageRoles = ["admin", "sysadmin", "audit_manager"];
-const approverRoles = [
-  "admin",
-  "sysadmin",
-  "audit_manager",
-  "auditor",
-  "compliance_officer",
-];
-const adminOnly = ["admin", "sysadmin"];
-
-// --- Approval Routes ---
-
 // GET /api/approvals - View All (Admin/Manager view)
 router.get(
   "/",
   auth,
-  authorizeRoles(...manageRoles),
+  authorizeRoles(...can("APPROVAL", "VIEW")),
   approvalController.getAllApprovals
 );
 
@@ -42,7 +23,7 @@ router.get("/my-approvals", auth, approvalController.getMyApprovals);
 router.get(
   "/:id",
   auth,
-  authorizeRoles(...viewRoles),
+  authorizeRoles(...can("APPROVAL", "VIEW")),
   approvalController.getApprovalById
 );
 
@@ -50,7 +31,7 @@ router.get(
 router.post(
   "/",
   auth,
-  authorizeRoles(...manageRoles),
+  authorizeRoles(...can("APPROVAL", "CREATE")),
   approvalController.createApproval
 );
 
@@ -58,52 +39,82 @@ router.post(
 router.put(
   "/:id",
   auth,
-  authorizeRoles(...manageRoles),
+  authorizeRoles(...can("APPROVAL", "UPDATE")),
   approvalController.updateApproval
 );
 
-// ✅ ADDED: PATCH /api/approvals/:id - Partial update (if your frontend uses PATCH)
+// PATCH /api/approvals/:id - Partial update
 router.patch(
   "/:id",
   auth,
-  authorizeRoles(...manageRoles),
+  authorizeRoles(...can("APPROVAL", "UPDATE")),
   approvalController.updateApproval
 );
 
-// ✅ ADDED: DELETE /api/approvals/:id - Delete approval
+// DELETE /api/approvals/:id - Delete approval
 router.delete(
   "/:id",
   auth,
-  authorizeRoles(...adminOnly),
+  authorizeRoles(...can("APPROVAL", "DELETE")),
   approvalController.deleteApproval
 );
 
 // --- Approval Actions (Specific to Approvers/Users) ---
 
 // POST /api/approvals/:id/approve - Approve
-router.post("/:id/approve", auth, approvalController.approveRequest);
+router.post(
+  "/:id/approve", 
+  auth, 
+  authorizeRoles(...can("APPROVAL", "APPROVE")),
+  approvalController.approveRequest
+);
 
 // POST /api/approvals/:id/reject - Reject
-router.post("/:id/reject", auth, approvalController.rejectRequest);
+router.post(
+  "/:id/reject", 
+  auth, 
+  authorizeRoles(...can("APPROVAL", "APPROVE")),
+  approvalController.rejectRequest
+);
 
 // POST /api/approvals/:id/escalate - Escalate
-router.post("/:id/escalate", auth, approvalController.escalateRequest);
+router.post(
+  "/:id/escalate", 
+  auth, 
+  authorizeRoles(...can("APPROVAL", "APPROVE")),
+  approvalController.escalateRequest
+);
 
 // PATCH /api/approvals/:id/requirement - Update requirement checklist
-router.patch("/:id/requirement", auth, approvalController.updateRequirement);
+router.patch(
+  "/:id/requirement", 
+  auth, 
+  authorizeRoles(...can("APPROVAL", "UPDATE")),
+  approvalController.updateRequirement
+);
 
 // POST /api/approvals/:id/comment - Add comment to history
 router.post(
   "/:id/comment",
   auth,
-  authorizeRoles(...viewRoles),
+  authorizeRoles(...can("APPROVAL", "VIEW")),
   approvalController.addComment
 );
 
 // POST /api/approvals/bulk/approve - Bulk approve multiple requests
-router.post("/bulk/approve", auth, approvalController.bulkApproveRequests);
+router.post(
+  "/bulk/approve", 
+  auth, 
+  authorizeRoles(...can("APPROVAL", "APPROVE")),
+  approvalController.bulkApproveRequests
+);
 
 // POST /api/approvals/bulk/reject - Bulk reject multiple requests
-router.post("/bulk/reject", auth, approvalController.bulkRejectRequests);
+router.post(
+  "/bulk/reject", 
+  auth, 
+  authorizeRoles(...can("APPROVAL", "APPROVE")),
+  approvalController.bulkRejectRequests
+);
 
 export default router;
