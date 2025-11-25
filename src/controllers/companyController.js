@@ -91,16 +91,20 @@ export const getCompanyById = async (req, res) => {
   try {
     const company = await Company.findById(req.params.id)
       .populate("group", "name")
-      .populate("createdBy", "name email");
+      .populate("createdBy", "name email")
+      .populate("updatedBy", "name email");
+
     if (!company) {
-      return res.status(404).json({ message: "Company not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Company not found",
+      });
     }
 
     res.status(200).json({
       data: company,
       message: "Company fetched successfully",
       success: true,
-      count: companies.length,
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });

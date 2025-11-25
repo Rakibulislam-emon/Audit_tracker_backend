@@ -97,7 +97,7 @@ const loginUser = async (req, res) => {
 const getAllUsers = async (req, res) => {
   try {
     const { search, role, status } = req.query;
-   
+
     let filter = {};
 
     // Search in name or email
@@ -136,6 +136,32 @@ const getAllUsers = async (req, res) => {
     });
   }
 };
+
+// Get user by ID
+const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    console.log("Get user by ID error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching user",
+    });
+  }
+};
+
 // logout user
 const logoutUser = async (req, res) => {
   try {
@@ -158,9 +184,10 @@ const updateUser = async (req, res) => {
     user.name = req.body.name || user.name;
     user.email = req.body.email || user.email;
     user.role = req.body.role || user.role;
-     // ✅ FIX: Convert string to boolean
+    // ✅ FIX: Convert string to boolean
     if (req.body.isActive !== undefined) {
-      user.isActive = req.body.isActive === 'active' || req.body.isActive === true;
+      user.isActive =
+        req.body.isActive === "active" || req.body.isActive === true;
     }
     await user.save();
     res.status(200).json({ message: "User updated successfully" });
@@ -172,7 +199,7 @@ const updateUser = async (req, res) => {
 
 // delete user
 const deleteUser = async (req, res) => {
-  console.log(req.params)
+  console.log(req.params);
   try {
     await User.findByIdAndDelete(req.params.id);
     res.status(200).json({ message: "User deleted successfully" });
@@ -185,6 +212,7 @@ const deleteUser = async (req, res) => {
 export {
   deleteUser,
   getAllUsers,
+  getUserById,
   loginUser,
   logoutUser,
   registerUser,
