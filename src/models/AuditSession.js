@@ -79,5 +79,16 @@ const auditSessionSchema = new mongoose.Schema(
 // Index: Prevent duplicate sessions for the same schedule at the same site
 auditSessionSchema.index({ schedule: 1, site: 1 }, { unique: true });
 
+// Virtual Populate: Get all team members for this session
+auditSessionSchema.virtual("teamMembers", {
+  ref: "Team", // The model to use
+  localField: "_id", // Find people where `localField`
+  foreignField: "auditSession", // is equal to `foreignField`
+});
+
+// Ensure virtuals are included in JSON output
+auditSessionSchema.set("toJSON", { virtuals: true });
+auditSessionSchema.set("toObject", { virtuals: true });
+
 export default mongoose.models.AuditSession ||
   mongoose.model("AuditSession", auditSessionSchema);

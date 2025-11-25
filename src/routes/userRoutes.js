@@ -2,6 +2,7 @@ import express from "express";
 import {
   deleteUser,
   getAllUsers,
+  getUserById,
   loginUser,
   logoutUser,
   registerUser,
@@ -16,6 +17,7 @@ const router = express.Router();
 
 // router.get("/me", auth, getCurrentUser);
 router.get("/", auth, authorizeRoles(...can("USER", "VIEW")), getAllUsers);
+router.get("/:id", auth, authorizeRoles(...can("USER", "VIEW")), getUserById);
 router.post("/", auth, authorizeRoles(...can("USER", "CREATE")), registerUser);
 router.post("/login", loginUser);
 router.patch(

@@ -61,6 +61,14 @@ export const getAllAuditSessions = async (req, res) => {
       .populate("site", "name location") // Populate site details
       .populate("checkType", "name") // Populate checkType name (if exists)
       .populate("schedule", "title startDate endDate") // Populate schedule details
+      .populate({
+        path: "teamMembers",
+        select: "user roleInTeam",
+        populate: {
+          path: "user",
+          select: "name email role",
+        },
+      })
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email")
       .sort({ createdAt: -1 }); // Sort by creation date (or startDate?)
@@ -89,6 +97,14 @@ export const getAuditSessionById = async (req, res) => {
       .populate("site", "name location")
       .populate("checkType", "name")
       .populate("schedule", "title startDate endDate")
+      .populate({
+        path: "teamMembers",
+        select: "user roleInTeam",
+        populate: {
+          path: "user",
+          select: "name email role",
+        },
+      })
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
@@ -97,13 +113,11 @@ export const getAuditSessionById = async (req, res) => {
         .status(404)
         .json({ message: "Audit session not found", success: false });
 
-    res
-      .status(200)
-      .json({
-        data: auditSession,
-        message: "Audit session fetched successfully",
-        success: true,
-      });
+    res.status(200).json({
+      data: auditSession,
+      message: "Audit session fetched successfully",
+      success: true,
+    });
   } catch (error) {
     console.error("[getAuditSessionById] Error:", error);
     res.status(500).json({ message: "Server error", error: error.message });
@@ -128,12 +142,10 @@ export const createAuditSession = async (req, res) => {
     // Validation (Required fields from schema)
     if (!template || !site || !schedule) {
       // checkType is optional now
-      return res
-        .status(400)
-        .json({
-          message: "Template, Site, and Schedule are required",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "Template, Site, and Schedule are required",
+        success: false,
+      });
     }
     // Date validation if dates are provided
     if (startDate && endDate && new Date(endDate) <= new Date(startDate)) {
@@ -166,46 +178,37 @@ export const createAuditSession = async (req, res) => {
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
-    res
-      .status(201)
-      .json({
-        data: savedAuditSession,
-        message: "Audit session created successfully",
-        success: true,
-      });
+    res.status(201).json({
+      data: savedAuditSession,
+      message: "Audit session created successfully",
+      success: true,
+    });
   } catch (error) {
     console.error("[createAuditSession] Error:", error);
     // Handle Unique Index Violation (schedule + site)
     if (error.code === 11000) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "An audit session for this schedule and site already exists.",
-          error: error.message,
-          success: false,
-        });
+      return res.status(400).json({
+        message: "An audit session for this schedule and site already exists.",
+        error: error.message,
+        success: false,
+      });
     }
     // Handle Mongoose Validation Errors
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors)
         .map((el) => el.message)
         .join(" ");
-      return res
-        .status(400)
-        .json({
-          message: messages || error.message,
-          error: error.errors,
-          success: false,
-        });
-    }
-    res
-      .status(400)
-      .json({
-        message: "Error creating audit session",
-        error: error.message,
+      return res.status(400).json({
+        message: messages || error.message,
+        error: error.errors,
         success: false,
       });
+    }
+    res.status(400).json({
+      message: "Error creating audit session",
+      error: error.message,
+      success: false,
+    });
   }
 };
 
@@ -229,12 +232,10 @@ export const updateAuditSession = async (req, res) => {
     // Validation (Required fields cannot be removed)
     if (template === null || site === null || schedule === null) {
       // Check for null explicitly if needed
-      return res
-        .status(400)
-        .json({
-          message: "Template, Site, and Schedule cannot be removed",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "Template, Site, and Schedule cannot be removed",
+        success: false,
+      });
     }
     if (startDate && endDate && new Date(endDate) <= new Date(startDate)) {
       return res
@@ -275,45 +276,37 @@ export const updateAuditSession = async (req, res) => {
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
 
-    res
-      .status(200)
-      .json({
-        data: updatedAuditSession,
-        message: "Audit session updated successfully",
-        success: true,
-      });
+    res.status(200).json({
+      data: updatedAuditSession,
+      message: "Audit session updated successfully",
+      success: true,
+    });
   } catch (error) {
     console.error("[updateAuditSession] Error:", error);
     // Handle potential unique index conflict on update (if schedule/site changes)
     if (error.code === 11000) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "An audit session for this schedule and site might already exist.",
-          error: error.message,
-          success: false,
-        });
+      return res.status(400).json({
+        message:
+          "An audit session for this schedule and site might already exist.",
+        error: error.message,
+        success: false,
+      });
     }
     if (error.name === "ValidationError") {
       const messages = Object.values(error.errors)
         .map((el) => el.message)
         .join(" ");
-      return res
-        .status(400)
-        .json({
-          message: messages || error.message,
-          error: error.errors,
-          success: false,
-        });
-    }
-    res
-      .status(400)
-      .json({
-        message: "Error updating audit session",
-        error: error.message,
+      return res.status(400).json({
+        message: messages || error.message,
+        error: error.errors,
         success: false,
       });
+    }
+    res.status(400).json({
+      message: "Error updating audit session",
+      error: error.message,
+      success: false,
+    });
   }
 };
 
@@ -327,21 +320,17 @@ export const deleteAuditSession = async (req, res) => {
       return res
         .status(404)
         .json({ message: "Audit session not found", success: false });
-    res
-      .status(200)
-      .json({
-        message: "Audit session deleted successfully",
-        success: true,
-        data: deletedAuditSession,
-      });
+    res.status(200).json({
+      message: "Audit session deleted successfully",
+      success: true,
+      data: deletedAuditSession,
+    });
   } catch (error) {
     console.error("[deleteAuditSession] Error:", error);
-    res
-      .status(500)
-      .json({
-        message: "Error deleting audit session",
-        error: error.message,
-        success: false,
-      });
+    res.status(500).json({
+      message: "Error deleting audit session",
+      error: error.message,
+      success: false,
+    });
   }
 };
