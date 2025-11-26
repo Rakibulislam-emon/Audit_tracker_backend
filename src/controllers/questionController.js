@@ -14,7 +14,7 @@ export const getAllQuestions = async (req, res) => {
       status,
       responseType,
       rule,
-      checkType,
+      // checkType,`
       template, // 🎯 NEW: Template filter (for future use)
       site, // 🎯 NEW: Site filter (CRITICAL FOR OBSERVATIONS)
     } = req.query;
@@ -31,9 +31,9 @@ export const getAllQuestions = async (req, res) => {
     if (rule) {
       query.rule = rule;
     }
-    if (checkType) {
-      query.checkType = checkType;
-    }
+    // if (checkType) {
+    //   query.checkType = checkType;
+    // }
     if (responseType) {
       query.responseType = responseType;
     }
@@ -104,7 +104,7 @@ export const getAllQuestions = async (req, res) => {
     // 🎯 STEP 7: Find data with population
     const questions = await Question.find(query)
       .populate("rule", "name ruleCode category")
-      .populate("checkType", "name")
+      // .populate("checkType", "name")
       .populate("applicableSites", "name location") // 🎯 NEW: Populate site names
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email")
@@ -133,7 +133,7 @@ export const getQuestionById = async (req, res) => {
   try {
     const question = await Question.findById(req.params.id)
       .populate("rule", "name ruleCode category") // ✅ Populate new rule field
-      .populate("checkType", "name") // ✅ Populate new checkType field
+      // .populate("checkType", "name") // ✅ Populate new checkType field
       // ❌ REMOVED: .populate('template', 'title')
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
@@ -169,7 +169,7 @@ export const createQuestion = async (req, res) => {
       severityDefault,
       weight,
       rule,
-      checkType,
+      // checkType,
     } = req.body;
 
     // Validation
@@ -188,7 +188,7 @@ export const createQuestion = async (req, res) => {
       severityDefault,
       weight,
       rule: rule || null, // ✅ ADDED (optional)
-      checkType: checkType || null, // ✅ ADDED (optional)
+      // checkType: checkType || null, // ✅ ADDED (optional)
       // ❌ template field REMOVED
       ...createdBy(req),
     });
@@ -198,7 +198,7 @@ export const createQuestion = async (req, res) => {
     // Populate after saving
     savedQuestion = await Question.findById(savedQuestion._id)
       .populate("rule", "name ruleCode") // ✅ Populate new fields
-      .populate("checkType", "name") // ✅ Populate new fields
+      // .populate("checkType", "name") // ✅ Populate new fields
       // ❌ REMOVED: .populate('template', 'title')
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
@@ -233,7 +233,7 @@ export const updateQuestion = async (req, res) => {
       severityDefault,
       weight,
       rule,
-      checkType,
+      // checkType,
       status,
     } = req.body;
     const questionId = req.params.id;
@@ -260,7 +260,7 @@ export const updateQuestion = async (req, res) => {
       updateData.severityDefault = severityDefault;
     if (weight) updateData.weight = weight;
     if (rule !== undefined) updateData.rule = rule || null; // Allow setting to null
-    if (checkType !== undefined) updateData.checkType = checkType || null; // Allow setting to null
+    // if (checkType !== undefined) updateData.checkType = checkType || null; // Allow setting to null
     if (status) updateData.status = status;
     // ❌ template field REMOVED
 
@@ -279,7 +279,7 @@ export const updateQuestion = async (req, res) => {
     // Repopulate for response
     updatedQuestion = await Question.findById(updatedQuestion._id)
       .populate("rule", "name ruleCode") // ✅ Populate new fields
-      .populate("checkType", "name") // ✅ Populate new fields
+      // .populate("checkType", "name") // ✅ Populate new fields
       // ❌ REMOVED: .populate('template', 'title')
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
