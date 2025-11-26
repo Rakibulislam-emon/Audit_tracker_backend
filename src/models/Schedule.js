@@ -35,6 +35,15 @@ const scheduleSchema = new mongoose.Schema(
       ref: "Program",
       required: false,
     },
+    purpose: {
+      type: String,
+      enum: {
+        values: ["company", "site"],
+        message: "{VALUE} is not a valid purpose.",
+      },
+      required: [true, "Schedule purpose is required."],
+      default: "site", // Default for backward compatibility
+    },
     scheduleStatus: {
       type: String,
       enum: {

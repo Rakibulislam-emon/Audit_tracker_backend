@@ -108,7 +108,10 @@ export const createSchedule = async (req, res) => {
       program,
       scheduleStatus,
       sites,
+      
       assignedUser,
+      purpose,
+     
     } = req.body;
 
     if (!title || !startDate || !endDate || !company) {
@@ -130,7 +133,10 @@ export const createSchedule = async (req, res) => {
       company,
       program: program || null,
       scheduleStatus: scheduleStatus || "scheduled",
-      sites: sites || [],
+      scheduleStatus: scheduleStatus || "scheduled",
+      sites: purpose === "site" ? sites : [], // Enforce empty sites if purpose is company
+      assignedUser: assignedUser || null,
+      purpose,
       assignedUser: assignedUser || null,
       ...createdBy(req),
     });
@@ -189,7 +195,9 @@ export const updateSchedule = async (req, res) => {
       status,
       scheduleStatus,
       sites,
+      
       assignedUser,
+      purpose,
     } = req.body;
     const scheduleId = req.params.id;
 
@@ -211,7 +219,10 @@ export const updateSchedule = async (req, res) => {
       endDate,
       company,
       program: program || null,
-      sites: sites || [],
+      program: program || null,
+      sites: purpose === "site" ? sites : [], // Enforce empty sites if purpose is company
+      assignedUser: assignedUser || null,
+      purpose,
       assignedUser: assignedUser || null,
       ...updatedBy(req),
     };
@@ -367,19 +378,6 @@ export const startScheduleAudits = async (req, res) => {
         success: false,
       });
     }
-
-    const sessionsToCreate = schedule.sites.map((siteId) => ({
-      title: `${schedule.title} - ${new Date().toLocaleDateString()}`,
-      schedule: schedule._id,
-      template: schedule.program.template._id,
-      checkType: schedule.program.template.checkType,
-      site: siteId,
-      workflowStatus: "in-progress",
-      startDate: new Date(),
-      ...createdBy(req),
-    }));
-
-    const createdSessions = await AuditSession.insertMany(sessionsToCreate);
 
     if (schedule.assignedUser) {
       const teamPromises = createdSessions.map((session) => {
