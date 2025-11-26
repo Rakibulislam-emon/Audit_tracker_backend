@@ -21,12 +21,12 @@ const programSchema = new mongoose.Schema(
       doc: "The date the program ends. Can be null for ongoing programs.",
     },
 
-    company: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Company",
-      required: [true, "Company is required"],
-      // index: true,
-    },
+    // company: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Company",
+    //   required: [true, "Company is required"],
+    //   // index: true,
+    // },
     template: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Template",
