@@ -15,11 +15,11 @@ const templateSchema = new mongoose.Schema(
       type: String,
       default: "1.0",
     },
-    company: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Company",
-      required: [true, "Company is required."],
-    },
+    // company: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Company",
+    //   required: [false, "Company is required."],
+    // },
 
     checkType: {
       type: mongoose.Schema.Types.ObjectId,
