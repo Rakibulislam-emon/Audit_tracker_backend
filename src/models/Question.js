@@ -23,7 +23,7 @@ const questionSchema = new mongoose.Schema(
     rule: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Rule",
-      required: false,
+      required: true,
     },
 
     checkType: {

@@ -35,6 +35,15 @@ const scheduleSchema = new mongoose.Schema(
       ref: "Program",
       required: false,
     },
+    purpose: {
+      type: String,
+      enum: {
+        values: ["company", "site"],
+        message: "{VALUE} is not a valid purpose.",
+      },
+      required: [true, "Schedule purpose is required."],
+      default: "site", // Default for backward compatibility
+    },
     scheduleStatus: {
       type: String,
       enum: {
@@ -50,13 +59,14 @@ const scheduleSchema = new mongoose.Schema(
       default: "scheduled",
       required: true,
     },
-    sites: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Site",
-        required: false,
+    site: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Site",
+      required: function () {
+        return this.purpose === "site";
       },
-    ],
+    },
+
     assignedUser: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -69,7 +79,7 @@ const scheduleSchema = new mongoose.Schema(
   }
 );
 
-scheduleSchema.index({ company: 1, startDate: 1 }, { unique: true });
+scheduleSchema.index({ company: 1, site: 1, startDate: 1 }, { unique: true });
 
 export default mongoose.models.Schedule ||
   mongoose.model("Schedule", scheduleSchema);

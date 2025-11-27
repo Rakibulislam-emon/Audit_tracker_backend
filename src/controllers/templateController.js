@@ -7,7 +7,7 @@ import { createdBy, updatedBy } from "../utils/helper.js"; // Ensure updatedBy i
 export const getAllTemplates = async (req, res) => {
   try {
     // Step 1: Get filter values (✅ checkType ADDED)
-    const { search, company, status, checkType } = req.query;
+    const { search, /* company, */ status, checkType } = req.query;
     console.log("[getAllTemplates] req.query:", req.query);
 
     // Step 2: Create dynamic Mongoose query object
@@ -17,9 +17,9 @@ export const getAllTemplates = async (req, res) => {
     if (status === "active" || status === "inactive") {
       query.status = status; // From commonFields
     }
-    if (company) {
-      query.company = company; // Company _id from frontend
-    }
+    // if (company) {
+    //   query.company = company; // Company _id from frontend
+    // }
     if (checkType) {
       // ✅ ADDED filter by checkType
       query.checkType = checkType;
@@ -38,7 +38,7 @@ export const getAllTemplates = async (req, res) => {
 
     // Step 5: Find data, populate relationships, and sort
     const templates = await Template.find(query)
-      .populate("company", "name")
+      // .populate("company", "name")
       .populate("checkType", "name") // ✅ ADDED checkType population
       // .populate("questions") // ❌ DANGER: Do not populate full questions array in list view. Too much data.
       .populate("createdBy", "name email")
@@ -67,7 +67,7 @@ export const getAllTemplates = async (req, res) => {
 export const getTemplateById = async (req, res) => {
   try {
     const template = await Template.findById(req.params.id)
-      .populate("company", "name")
+      // .populate("company", "name")
       .populate("checkType", "name") // ✅ ADDED checkType population
       .populate({
         // ✅ ADDED: Populate questions array fully for detail view
@@ -105,24 +105,22 @@ export const getTemplateById = async (req, res) => {
 export const createTemplate = async (req, res) => {
   try {
     // ✅ checkType and questions (array) ADDED
-    const { title, description, version, company, checkType, questions } =
+    const { title, description, version, /* company, */ checkType, questions } =
       req.body;
 
     // Validation
-    if (!title || !company || !checkType) {
-      return res
-        .status(400)
-        .json({
-          message: "Title, Company, and Check Type are required",
-          success: false,
-        });
+    if (!title || /* !company || */ !checkType) {
+      return res.status(400).json({
+        message: "Title, Company, and Check Type are required",
+        success: false,
+      });
     }
 
     const newTemplate = new Template({
       title,
       description,
       version,
-      company,
+      // company,
       checkType, // ✅ ADDED
       questions: questions || [], // ✅ ADDED (default to empty array)
       ...createdBy(req),
@@ -131,7 +129,7 @@ export const createTemplate = async (req, res) => {
 
     // Populate after saving for accurate response
     savedTemplate = await Template.findById(savedTemplate._id)
-      .populate("company", "name")
+      // .populate("company", "name")
       .populate("checkType", "name")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
@@ -173,7 +171,7 @@ export const updateTemplate = async (req, res) => {
       title,
       description,
       version,
-      company,
+      // company,
       checkType,
       questions,
       status,
@@ -181,20 +179,18 @@ export const updateTemplate = async (req, res) => {
     const templateId = req.params.id;
 
     // Validation
-    if (!title || !company || !checkType) {
-      return res
-        .status(400)
-        .json({
-          message: "Title, Company, and Check Type are required",
-          success: false,
-        });
+    if (!title || /* !company || */ !checkType) {
+      return res.status(400).json({
+        message: "Title, Company, and Check Type are required",
+        success: false,
+      });
     }
 
     const updateData = {
       title,
       description,
       version,
-      company,
+      // company,
       checkType, // ✅ ADDED
       questions: questions || [], // ✅ ADDED
       status, // ✅ ADDED status
@@ -215,7 +211,7 @@ export const updateTemplate = async (req, res) => {
 
     // Populate after update
     updatedTemplate = await Template.findById(updatedTemplate._id)
-      .populate("company", "name")
+      // .populate("company", "name")
       .populate("checkType", "name")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");

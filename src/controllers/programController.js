@@ -16,7 +16,7 @@ export const getAllPrograms = async (req, res) => {
   try {
     const {
       search,
-      company,
+      /* company, */
       status,
       programStatus,
       startDate,
@@ -30,7 +30,7 @@ export const getAllPrograms = async (req, res) => {
     const query = {};
 
     // Apply filters for relational fields (ObjectId) and enums.
-    if (company) query.company = company;
+    // if (company) query.company = company;
     if (template) query.template = template;
     if (frequency) query.frequency = frequency;
     if (status === "active" || status === "inactive") query.status = status;
@@ -65,7 +65,7 @@ export const getAllPrograms = async (req, res) => {
 
     // Execute the query, populating related documents for a complete response.
     const programs = await Program.find(query)
-      .populate("company", "name")
+      // .populate("company", "name")
       .populate("template", "title version")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email")
@@ -93,7 +93,7 @@ export const getAllPrograms = async (req, res) => {
 export const getProgramById = async (req, res) => {
   try {
     const program = await Program.findById(req.params.id)
-      .populate("company", "name")
+      // .populate("company", "name")
       .populate("template", "title version")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
@@ -128,14 +128,14 @@ export const createProgram = async (req, res) => {
       startDate,
       endDate,
       programStatus,
-      company,
+      /* company, */
       template,
       frequency,
       responsibleDept,
     } = req.body;
 
     // Basic server-side validation for required fields.
-    if (!name || !company || !template) {
+    if (!name || /* !company || */ !template) {
       return res.status(400).json({
         message: "Name, Company, and Template are required fields.",
         success: false,
@@ -148,7 +148,7 @@ export const createProgram = async (req, res) => {
       startDate,
       endDate,
       programStatus,
-      company,
+      // company,
       template,
       frequency,
       responsibleDept,
@@ -159,7 +159,7 @@ export const createProgram = async (req, res) => {
 
     // Re-fetch the new document with populated relations for a complete response.
     savedProgram = await Program.findById(savedProgram._id)
-      .populate("company", "name")
+      // .populate("company", "name")
       .populate("template", "title version")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
@@ -201,14 +201,14 @@ export const updateProgram = async (req, res) => {
       endDate,
       status,
       programStatus,
-      company,
+      /* company, */
       template,
       frequency,
       responsibleDept,
     } = req.body;
     const programId = req.params.id;
 
-    if (!name || !company || !template) {
+    if (!name || /* !company || */ !template) {
       return res.status(400).json({
         message: "Name, Company, and Template are required fields.",
         success: false,
@@ -221,7 +221,7 @@ export const updateProgram = async (req, res) => {
       description,
       startDate,
       endDate,
-      company,
+      // company,
       template,
       frequency,
       responsibleDept,
@@ -256,7 +256,7 @@ export const updateProgram = async (req, res) => {
 
     // Re-populate relations for the client response.
     updatedProgram = await Program.findById(updatedProgram._id)
-      .populate("company", "name")
+      // .populate("company", "name")
       .populate("template", "title version")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
