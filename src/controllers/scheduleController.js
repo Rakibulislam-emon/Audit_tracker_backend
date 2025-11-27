@@ -1,5 +1,6 @@
 import AuditSession from "../models/AuditSession.js";
 import Schedule from "../models/Schedule.js";
+import Site from "../models/Site.js";
 import Team from "../models/Team.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
 
@@ -30,7 +31,7 @@ export const getAllSchedules = async (req, res) => {
     ) {
       query.scheduleStatus = scheduleStatus;
     }
-    if (site) query.sites = site;
+    if (site) query.site = site;
     if (auditor) query.assignedUser = auditor;
 
     if (search) {
@@ -41,7 +42,7 @@ export const getAllSchedules = async (req, res) => {
     const schedules = await Schedule.find(query)
       .populate("company", "name")
       .populate("program", "name")
-      .populate("sites", "name")
+      .populate("site", "name")
       .populate("assignedUser", "name email")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email")
@@ -71,7 +72,7 @@ export const getScheduleById = async (req, res) => {
     const schedule = await Schedule.findById(req.params.id)
       .populate("company", "name")
       .populate("program", "name")
-      .populate("sites", "name")
+      .populate("site", "name")
       .populate("assignedUser", "name email")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
@@ -96,6 +97,7 @@ export const getScheduleById = async (req, res) => {
 /**
  * Creates a new schedule in the database.
  * Validates required fields and date logic.
+ * Handles bulk creation if purpose is 'company'.
  * @route POST /api/schedules
  */
 export const createSchedule = async (req, res) => {
@@ -107,11 +109,9 @@ export const createSchedule = async (req, res) => {
       company,
       program,
       scheduleStatus,
-      sites,
-      
+      site,
       assignedUser,
       purpose,
-     
     } = req.body;
 
     if (!title || !startDate || !endDate || !company) {
@@ -126,34 +126,68 @@ export const createSchedule = async (req, res) => {
         .json({ message: "End date must be after start date", success: false });
     }
 
-    const newSchedule = new Schedule({
-      title,
-      startDate,
-      endDate,
-      company,
-      program: program || null,
-      scheduleStatus: scheduleStatus || "scheduled",
-      scheduleStatus: scheduleStatus || "scheduled",
-      sites: purpose === "site" ? sites : [], // Enforce empty sites if purpose is company
-      assignedUser: assignedUser || null,
-      purpose,
-      assignedUser: assignedUser || null,
-      ...createdBy(req),
-    });
+    let createdSchedules = [];
 
-    let savedSchedule = await newSchedule.save();
+    if (purpose === "company") {
+      // Fetch all active sites for the company
+      const sites = await Site.find({ company, status: "active" });
 
-    savedSchedule = await Schedule.findById(savedSchedule._id)
-      .populate("company", "name")
-      .populate("program", "name")
-      .populate("sites", "name")
-      .populate("assignedUser", "name email")
-      .populate("createdBy", "name email")
-      .populate("updatedBy", "name email");
+      if (!sites || sites.length === 0) {
+        return res.status(400).json({
+          message: "No active sites found for this company.",
+          success: false,
+        });
+      }
 
+      // Create a schedule for each site
+      const schedulePromises = sites.map((siteItem) => {
+        return new Schedule({
+          title: `${title} - ${siteItem.name}`,
+          startDate,
+          endDate,
+          company,
+          program: program || null,
+          scheduleStatus: scheduleStatus || "scheduled",
+          site: siteItem._id,
+          assignedUser: assignedUser || null,
+          purpose: "site", // Force purpose to 'site' for individual records
+          ...createdBy(req),
+        }).save();
+      });
+
+      createdSchedules = await Promise.all(schedulePromises);
+    } else {
+      // Single site schedule
+      if (!site) {
+        return res.status(400).json({
+          message: "Site is required when purpose is 'site'.",
+          success: false,
+        });
+      }
+
+      const newSchedule = new Schedule({
+        title,
+        startDate,
+        endDate,
+        company,
+        program: program || null,
+        scheduleStatus: scheduleStatus || "scheduled",
+        site,
+        assignedUser: assignedUser || null,
+        purpose,
+        ...createdBy(req),
+      });
+
+      const savedSchedule = await newSchedule.save();
+      createdSchedules.push(savedSchedule);
+    }
+
+    // Populate the first one for response (or all if needed, but usually list refresh handles it)
+    // Sending back the list of created IDs or the first object
     res.status(201).json({
-      data: savedSchedule,
-      message: "Schedule created successfully",
+      data: createdSchedules,
+      count: createdSchedules.length,
+      message: `${createdSchedules.length} schedule(s) created successfully`,
       success: true,
     });
   } catch (error) {
@@ -161,7 +195,7 @@ export const createSchedule = async (req, res) => {
     if (error.code === 11000) {
       return res.status(400).json({
         message:
-          "A schedule for this company starting on this date already exists.",
+          "A schedule for this company/site starting on this date already exists.",
         error: error.message,
         success: false,
       });
@@ -194,8 +228,7 @@ export const updateSchedule = async (req, res) => {
       program,
       status,
       scheduleStatus,
-      sites,
-      
+      site,
       assignedUser,
       purpose,
     } = req.body;
@@ -219,11 +252,9 @@ export const updateSchedule = async (req, res) => {
       endDate,
       company,
       program: program || null,
-      program: program || null,
-      sites: purpose === "site" ? sites : [], // Enforce empty sites if purpose is company
+      site: purpose === "site" ? site : undefined, // Only update site if purpose is site
       assignedUser: assignedUser || null,
       purpose,
-      assignedUser: assignedUser || null,
       ...updatedBy(req),
     };
 
@@ -257,7 +288,7 @@ export const updateSchedule = async (req, res) => {
     updatedSchedule = await Schedule.findById(updatedSchedule._id)
       .populate("company", "name")
       .populate("program", "name")
-      .populate("sites", "name")
+      .populate("site", "name")
       .populate("assignedUser", "name email")
       .populate("createdBy", "name email")
       .populate("updatedBy", "name email");
@@ -319,9 +350,7 @@ export const deleteSchedule = async (req, res) => {
 };
 
 /**
- * Atomically creates multiple AuditSessions and Teams from a single Schedule.
- * For each site in the schedule, an AuditSession is created.
- * If an auditor is assigned to the schedule, a Team is also created for each new session.
+ * Atomically creates an AuditSession and Team from a single Schedule.
  * The parent Schedule's status is updated to 'in-progress' upon success.
  * @route POST /api/schedules/:id/start
  */
@@ -338,7 +367,8 @@ export const startScheduleAudits = async (req, res) => {
         },
       })
       .populate("assignedUser", "name email")
-      .populate("sites", "name");
+      .populate("site", "name")
+      .populate("company", "name");
 
     if (!schedule) {
       return res
@@ -351,9 +381,9 @@ export const startScheduleAudits = async (req, res) => {
         success: false,
       });
     }
-    if (!schedule.sites || schedule.sites.length === 0) {
+    if (!schedule.site) {
       return res.status(400).json({
-        message: "No sites are assigned to this schedule.",
+        message: "No site is assigned to this schedule.",
         success: false,
       });
     }
@@ -374,44 +404,58 @@ export const startScheduleAudits = async (req, res) => {
       await schedule.save();
       return res.status(400).json({
         message:
-          "Sessions for this schedule already exist. Status has been corrected.",
+          "Session for this schedule already exists. Status has been corrected.",
         success: false,
       });
     }
 
-    if (schedule.assignedUser) {
-      const teamPromises = createdSessions.map((session) => {
-        const teamData = {
-          user: schedule.assignedUser._id || schedule.assignedUser,
-          roleInTeam: "lead",
-          auditSession: session._id,
-          ...createdBy(req),
-        };
-        return Team.create(teamData);
-      });
+    // Generate a meaningful title for the audit session
+    const dateStr = new Date(schedule.startDate).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const autoTitle = `${schedule.site.name} - ${
+      schedule.program?.name || "Audit"
+    } - ${dateStr}`;
 
-      await Promise.all(teamPromises);
+    // Create session for the single site
+    const session = await AuditSession.create({
+      title: autoTitle,
+      startDate: new Date(), // Set actual start date to now
+      // endDate will be set when the audit is completed
+      schedule: schedule._id,
+      template: schedule.program.template._id,
+      site: schedule.site._id,
+      checkType: schedule.program.template.checkType,
+      workflowStatus: "planned",
+      status: "active",
+      ...createdBy(req),
+    });
+
+    if (schedule.assignedUser) {
+      await Team.create({
+        user: schedule.assignedUser._id || schedule.assignedUser,
+        roleInTeam: "lead",
+        auditSession: session._id,
+        status: "active",
+        ...createdBy(req),
+      });
     }
 
     schedule.scheduleStatus = "in-progress";
     await schedule.save();
 
-    const successMessage = `${
-      createdSessions.length
-    } audit session(s) created successfully.${
-      schedule.assignedUser ? " Teams auto-created with assigned user." : ""
-    }`;
-
     res.status(201).json({
-      message: successMessage,
-      data: createdSessions,
+      message: "Audit session created successfully.",
+      data: [session], // Return as array for consistency with frontend expectations if any
       success: true,
     });
   } catch (error) {
     console.error("[startScheduleAudits] Error:", error);
     if (error.code === 11000) {
       return res.status(400).json({
-        message: "Audit sessions for this schedule and site(s) already exist.",
+        message: "Audit session for this schedule already exists.",
         success: false,
       });
     }

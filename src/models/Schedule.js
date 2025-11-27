@@ -59,13 +59,14 @@ const scheduleSchema = new mongoose.Schema(
       default: "scheduled",
       required: true,
     },
-    sites: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Site",
-        required: false,
+    site: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Site",
+      required: function () {
+        return this.purpose === "site";
       },
-    ],
+    },
+
     assignedUser: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -78,7 +79,7 @@ const scheduleSchema = new mongoose.Schema(
   }
 );
 
-scheduleSchema.index({ company: 1, startDate: 1 }, { unique: true });
+scheduleSchema.index({ company: 1, site: 1, startDate: 1 }, { unique: true });
 
 export default mongoose.models.Schedule ||
   mongoose.model("Schedule", scheduleSchema);
