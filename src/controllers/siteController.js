@@ -2,200 +2,145 @@
 
 import Site from "../models/Site.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import AppError from "../utils/AppError.js";
 
-// GET /api/sites - ফিল্টারিং, সর্টিং, পপুলেশন সহ
-export const getAllSites = async (req, res) => {
+// GET /api/sites - Filtering, Sorting, Population
+export const getAllSites = asyncHandler(async (req, res, next) => {
+  // Step 1: Get filter values from req.query
+  const { search, company, status } = req.query;
 
-    console.log("site arrived")
-    try {
-        // ধাপ ১: req.query থেকে ফিল্টার ভ্যালু নিন
-        const { search, company, status } = req.query;
-        console.log("[getAllSites] req.query:", req.query);
+  // Step 2: Create Mongoose query object
+  const query = {};
 
-        // ধাপ ২: Mongoose কুয়েরি অবজেক্ট তৈরি করুন
-        const query = {};
+  // Step 3: Add status and company filters
+  if (status === "active" || status === "inactive") {
+    query.status = status;
+  }
+  if (company) {
+    query.company = company;
+  }
 
-        // ধাপ ৩: স্ট্যাটাস এবং কোম্পানি ফিল্টার যোগ করুন
-        if (status === "active" || status === "inactive") {
-            query.status = status; // Site মডেলে 'status' আছে (commonFields থেকে)
-        }
-        if (company) {
-            query.company = company; // ফ্রন্টএন্ড থেকে company _id আসবে
-        }
+  // Step 4: Add search filter (name and location fields)
+  if (search) {
+    const searchRegex = { $regex: search, $options: "i" };
+    query.$or = [{ name: searchRegex }, { location: searchRegex }];
+  }
 
-        // ধাপ ৪: সার্চ ফিল্টার যোগ করুন (name এবং location ফিল্ডে)
-        if (search) {
-            const searchRegex = { $regex: search, $options: "i" };
-            query.$or = [
-                { name: searchRegex },
-                { location: searchRegex },
-                // আপনি চাইলে এখানে পপুলেটেড company name দিয়েও সার্চ করতে পারেন,
-                // কিন্তু তার জন্য aggregation pipeline লাগবে, যা একটু জটিল।
-                // আপাতত name ও location দিয়েই সার্চ সীমাবদ্ধ রাখা হলো।
-            ];
-        }
+  // Step 5: Find data using query object
+  const sites = await Site.find(query)
+    .populate("company", "name")
+    .populate("createdBy", "name email")
+    .populate("updatedBy", "name email")
+    .sort({ createdAt: -1 });
 
-        console.log("[getAllSites] Final Mongoose Query:", JSON.stringify(query));
+  // Step 6: Count total documents
+  const count = await Site.countDocuments(query);
 
-        // ধাপ ৫: কুয়েরি ব্যবহার করে ডেটা খুঁজুন এবং পপুলেট করুন
-        const sites = await Site.find(query)
-            .populate("company", "name") // Company-র শুধু নাম পপুলেট করুন
-            .populate("createdBy", "name email") // User-এর নাম ও ইমেইল
-            .populate("updatedBy", "name email") // User-এর নাম ও ইমেইল
-            .sort({ createdAt: -1 }); // সর্টিং
+  res.status(200).json({
+    data: sites,
+    count: count,
+    message: "Sites fetched successfully",
+    success: true,
+  });
+});
 
-            console.log("sites",sites)
-        // ধাপ ৬: মোট সংখ্যা গণনা করুন
-        const count = await Site.countDocuments(query);
+// GET /api/sites/:id
+export const getSiteById = asyncHandler(async (req, res, next) => {
+  const { id } = req.params;
+  const site = await Site.findById(id)
+    .populate("company", "name")
+    .populate("createdBy", "name email")
+    .populate("updatedBy", "name email");
 
-        // ✅ স্ট্যান্ডার্ড রেসপন্স ফরম্যাট ব্যবহার করুন
-        res.status(200).json({
-            data: sites,
-            count: count,
-            message: "Sites fetched successfully",
-            success: true,
-        });
+  if (!site) {
+    throw new AppError("Site not found", 404);
+  }
 
-    } catch (error) {
-        console.error("[getAllSites] Error:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
-};
+  res.status(200).json({
+    data: site,
+    message: "Site fetched successfully",
+    success: true,
+  });
+});
 
-// GET /api/sites/:id - Population ও রেসপন্স ফরম্যাট আপডেট
-export const getSiteById = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const site = await Site.findById(id)
-            .populate("company", "name")
-            .populate("createdBy", "name email")
-            .populate("updatedBy", "name email"); // ✅ updatedBy যোগ করা হয়েছে
+// POST /api/sites
+export const createSite = asyncHandler(async (req, res, next) => {
+  const { name, location, company } = req.body;
 
-        if (!site) {
-            return res.status(404).json({ message: "Site not found", success: false });
-        }
+  if (!name || !company) {
+    throw new AppError("Name and company are required", 400);
+  }
 
-        // ✅ স্ট্যান্ডার্ড রেসপন্স ফরম্যাট
-        res.status(200).json({
-            data: site,
-            message: "Site fetched successfully",
-            success: true,
-        });
+  const newSite = new Site({
+    name,
+    location,
+    company,
+    ...createdBy(req),
+  });
+  let savedSite = await newSite.save();
 
-    } catch (error) {
-        console.error("[getSiteById] Error:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
-};
+  // Populate after save
+  savedSite = await Site.findById(savedSite._id)
+    .populate("company", "name")
+    .populate("createdBy", "name email")
+    .populate("updatedBy", "name email");
 
-// POST /api/sites - Population ও রেসপন্স ফরম্যাট আপডেট
-export const createSite = async (req, res) => {
-    try {
-        const { name, location, company } = req.body;
+  res.status(201).json({
+    data: savedSite,
+    message: "Site created successfully",
+    success: true,
+  });
+});
 
-        if (!name || !company) {
-            return res.status(400).json({ message: "Name and company are required", success: false });
-        }
+// PUT /api/sites/:id
+export const updateSite = asyncHandler(async (req, res, next) => {
+  const { name, location, company } = req.body;
+  const siteId = req.params.id;
 
-        const newSite = new Site({
-            name,
-            location,
-            company,
-            ...createdBy(req) // createdBy যোগ করা হয়েছে
-        });
-        let savedSite = await newSite.save();
+  if (!name || !company) {
+    throw new AppError("Name and company are required", 400);
+  }
 
-        // ✅ Save করার পর পপুলেট করে রেসপন্স পাঠানো ভালো
-        savedSite = await Site.findById(savedSite._id)
-            .populate("company", "name")
-            .populate("createdBy", "name email")
-            .populate("updatedBy", "name email");
+  let updatedSite = await Site.findByIdAndUpdate(
+    siteId,
+    {
+      name,
+      location,
+      company,
+      ...updatedBy(req),
+    },
+    { new: true, runValidators: true }
+  );
 
+  if (!updatedSite) {
+    throw new AppError("Site not found", 404);
+  }
 
-        // ✅ স্ট্যান্ডার্ড রেসপন্স ফরম্যাট
-        res.status(201).json({
-            data: savedSite,
-            message: "Site created successfully",
-            success: true,
-        });
+  // Populate after update
+  updatedSite = await Site.findById(updatedSite._id)
+    .populate("company", "name")
+    .populate("createdBy", "name email")
+    .populate("updatedBy", "name email");
 
-    } catch (error) {
-        console.error("[createSite] Error:", error);
-        // Duplicate key error handling (যদি name ইউনিক হতে হয়)
-        if (error.code === 11000) {
-             return res.status(400).json({ message: "Site name already exists", error: error.message, success: false });
-        }
-        res.status(400).json({ message: "Error creating site", error: error.message, success: false });
-    }
-};
+  res.status(200).json({
+    data: updatedSite,
+    message: "Site updated successfully",
+    success: true,
+  });
+});
 
-// PUT /api/sites/:id - Population ও রেসপন্স ফরম্যাট আপডেট
-export const updateSite = async (req, res) => {
-    try {
-        const { name, location, company } = req.body;
-        const siteId = req.params.id;
+// DELETE /api/sites/:id
+export const deleteSite = asyncHandler(async (req, res, next) => {
+  const deletedSite = await Site.findByIdAndDelete(req.params.id);
 
-        // Validation: নিশ্চিত করুন name ও company আছে
-        if (!name || !company) {
-             return res.status(400).json({ message: "Name and company are required", success: false });
-        }
+  if (!deletedSite) {
+    throw new AppError("Site not found", 404);
+  }
 
-        let updatedSite = await Site.findByIdAndUpdate(
-            siteId,
-            {
-                name,
-                location,
-                company,
-                ...updatedBy(req) // updatedBy যোগ করা হয়েছে
-            },
-            { new: true, runValidators: true } // new: true আপডেট করা ডকুমেন্ট রিটার্ন করে
-        );
-
-        if (!updatedSite) {
-            return res.status(404).json({ message: "Site not found", success: false });
-        }
-
-        // ✅ আপডেট করার পর পপুলেট করুন
-        updatedSite = await Site.findById(updatedSite._id)
-            .populate("company", "name")
-            .populate("createdBy", "name email")
-            .populate("updatedBy", "name email");
-
-
-        // ✅ স্ট্যান্ডার্ড রেসপন্স ফরম্যাট
-        res.status(200).json({
-            data: updatedSite,
-            message: "Site updated successfully",
-            success: true,
-        });
-
-    } catch (error) {
-        console.error("[updateSite] Error:", error);
-         if (error.code === 11000) { // Duplicate key error
-             return res.status(400).json({ message: "Site name already exists", error: error.message, success: false });
-        }
-        res.status(400).json({ message: "Error updating site", error: error.message, success: false });
-    }
-};
-
-// DELETE /api/sites/:id - রেসপন্স ফরম্যাট আপডেট
-export const deleteSite = async (req, res) => {
-    try {
-        const deletedSite = await Site.findByIdAndDelete(req.params.id);
-
-        if (!deletedSite) {
-            return res.status(404).json({ message: "Site not found", success: false });
-        }
-
-        // ✅ স্ট্যান্ডার্ড রেসপন্স ফরম্যাট
-        res.status(200).json({
-             message: "Site deleted successfully",
-             success: true,
-             data: deletedSite // ডিলিট হওয়া আইটেমটি পাঠানো যেতে পারে (অপশনাল)
-        });
-
-    } catch (error) {
-        console.error("[deleteSite] Error:", error);
-        res.status(500).json({ message: "Error deleting site", error: error.message, success: false });
-    }
-};
+  res.status(200).json({
+    message: "Site deleted successfully",
+    success: true,
+    data: deletedSite,
+  });
+});

@@ -4,210 +4,175 @@
 
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
-const registerUser = async (req, res) => {
-  const { name, email, password, role } = req.body;
-  //  manual password added into the other fields
+import asyncHandler from "../utils/asyncHandler.js";
+import AppError from "../utils/AppError.js";
 
-  console.log(name, email, password, role);
-  try {
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res
-        .status(400)
-        .json({ message: "User already exists with this email" });
-    }
-    // create new user
-    const user = new User({
-      name,
-      email,
-      password,
-      role: role || "auditor",
-    });
-    console.log(user);
-    await user.save();
-    // send success response without password
-    res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      message: "User registered successfully",
-    });
-  } catch (error) {
-    console.log(" Registration error:", error.message);
-    res.status(500).json({ message: "Server error during Registration" });
+const registerUser = asyncHandler(async (req, res, next) => {
+  const { name, email, password, role } = req.body;
+
+  // Check if user exists
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    throw new AppError("User already exists with this email", 400);
   }
-};
+
+  // Create new user
+  const user = new User({
+    name,
+    email,
+    password,
+    role: role || "auditor",
+  });
+
+  await user.save();
+
+  // Send success response without password
+  res.status(201).json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    message: "User registered successfully",
+  });
+});
 
 // @desc Login user and get token
 // @route POST /api/users/login
 // @access Public
-
-const loginUser = async (req, res) => {
+const loginUser = asyncHandler(async (req, res, next) => {
   const { email, password } = req.body;
-  try {
-    // check if user exists
-    const user = await User.findOne({ email }).select("+password");
-    if (!user) {
-      return res.status(400).json({
-        message: "Invalid email or password",
-      });
-    }
-    // check password
-    const isMatch = await user.matchPassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
-    // generate token(expiry 7 days)
-    const token = jwt.sign(
-      { id: user._id, role: user.role, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
 
-    // loginUser function এ cookie settings change করুন
-    // res.cookie("token", token, {
-    //   httpOnly: true,
-    //   // secure: false, // Development এর জন্য false করুন
-    //   secure: true,
-    //   // sameSite: "lax",
-    //   sameSite: "none",
-    //   path: "/",
-    //   maxAge: 7 * 24 * 60 * 60 * 1000,
-    // });
-    // update last login
-    user.lastLogin = Date.now();
-    await user.save({ validateBeforeSave: false });
-    // Send response (without password)
-    res.json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      token,
-    });
-  } catch (error) {
-    console.log(" Login error:", error.message);
-    res.status(500).json({ message: "Server error during Login" });
+  // Check if email and password exist
+  if (!email || !password) {
+    throw new AppError("Please provide email and password", 400);
   }
-};
 
-// get all users
+  // Check if user exists & password is correct
+  const user = await User.findOne({ email }).select("+password");
 
-const getAllUsers = async (req, res) => {
-  try {
-    const { search, role, status } = req.query;
-
-    let filter = {};
-
-    // Search in name or email
-    if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: "i" } },
-        { email: { $regex: search, $options: "i" } },
-      ];
-    }
-
-    // Role filter
-    if (role) {
-      filter.role = role;
-    }
-
-    // Status filter
-    if (status === "active") {
-      filter.isActive = true;
-    } else if (status === "inactive") {
-      filter.isActive = false;
-    }
-
-    // Get users with projection (exclude password)
-    const users = await User.find(filter).select("-password");
-
-    res.json({
-      success: true,
-      count: users.length,
-      data: users,
-    });
-  } catch (error) {
-    console.log("Get all users error:", error.message);
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching users",
-    });
+  if (!user || !(await user.matchPassword(password))) {
+    throw new AppError("Invalid email or password", 401);
   }
-};
 
-// Get user by ID
-const getUserById = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id).select("-password");
+  // Generate token
+  const token = jwt.sign(
+    { id: user._id, role: user.role, email: user.email },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
+  // Update last login
+  user.lastLogin = Date.now();
+  await user.save({ validateBeforeSave: false });
 
-    res.json({
-      success: true,
-      data: user,
-    });
-  } catch (error) {
-    console.log("Get user by ID error:", error.message);
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching user",
-    });
+  // Send response
+  res.json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    token,
+  });
+});
+
+// @desc Get all users
+// @route GET /api/users
+// @access Private
+const getAllUsers = asyncHandler(async (req, res, next) => {
+  const { search, role, status } = req.query;
+
+  let filter = {};
+
+  // Search in name or email
+  if (search) {
+    filter.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { email: { $regex: search, $options: "i" } },
+    ];
   }
-};
 
-// logout user
-const logoutUser = async (req, res) => {
-  try {
-    res.clearCookie("token");
-    res.status(200).json({ message: "Logout successful" });
-  } catch (error) {
-    console.log(" Logout error:", error.message);
-    res.status(500).json({ message: "Server error during Logout" });
+  // Role filter
+  if (role) {
+    filter.role = role;
   }
-};
-// UPDATE USER
 
-const updateUser = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    console.log("user:", user);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    user.name = req.body.name || user.name;
-    user.email = req.body.email || user.email;
-    user.role = req.body.role || user.role;
-    // ✅ FIX: Convert string to boolean
-    if (req.body.isActive !== undefined) {
-      user.isActive =
-        req.body.isActive === "active" || req.body.isActive === true;
-    }
-    await user.save();
-    res.status(200).json({ message: "User updated successfully" });
-  } catch (error) {
-    console.log(" Update user error:", error.message);
-    res.status(500).json({ message: "Server error during Update user" });
+  // Status filter
+  if (status === "active") {
+    filter.isActive = true;
+  } else if (status === "inactive") {
+    filter.isActive = false;
   }
-};
 
-// delete user
-const deleteUser = async (req, res) => {
-  console.log(req.params);
-  try {
-    await User.findByIdAndDelete(req.params.id);
-    res.status(200).json({ message: "User deleted successfully" });
-  } catch (error) {
-    console.log(" Delete user error:", error.message);
-    res.status(500).json({ message: "Server error during Delete user" });
+  // Get users with projection (exclude password)
+  const users = await User.find(filter).select("-password");
+
+  res.json({
+    success: true,
+    count: users.length,
+    data: users,
+  });
+});
+
+// @desc Get user by ID
+// @route GET /api/users/:id
+// @access Private
+const getUserById = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.params.id).select("-password");
+
+  if (!user) {
+    throw new AppError("User not found", 404);
   }
-};
+
+  res.json({
+    success: true,
+    data: user,
+  });
+});
+
+// @desc Logout user
+// @route POST /api/users/logout
+// @access Private
+const logoutUser = asyncHandler(async (req, res, next) => {
+  res.clearCookie("token");
+  res.status(200).json({ message: "Logout successful" });
+});
+
+// @desc Update user
+// @route PUT /api/users/:id
+// @access Private
+const updateUser = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.params.id);
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  user.name = req.body.name || user.name;
+  user.email = req.body.email || user.email;
+  user.role = req.body.role || user.role;
+
+  // Convert string to boolean if present
+  if (req.body.isActive !== undefined) {
+    user.isActive =
+      req.body.isActive === "active" || req.body.isActive === true;
+  }
+
+  await user.save();
+  res.status(200).json({ message: "User updated successfully" });
+});
+
+// @desc Delete user
+// @route DELETE /api/users/:id
+// @access Private
+const deleteUser = asyncHandler(async (req, res, next) => {
+  const user = await User.findByIdAndDelete(req.params.id);
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  res.status(200).json({ message: "User deleted successfully" });
+});
 
 export {
   deleteUser,
