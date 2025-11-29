@@ -5,6 +5,8 @@ import * as companyController from "../controllers/companyController.js";
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
 import { can } from "../config/permissions.js";
+import { body } from "express-validator";
+import { validate } from "../middleware/validator.js";
 
 const router = Router();
 
@@ -24,6 +26,8 @@ router.post(
   "/",
   auth,
   authorizeRoles(...can("COMPANY", "CREATE")),
+  [body("name", "Company name is required").not().isEmpty()],
+  validate,
   companyController.createCompany
 );
 router.patch(

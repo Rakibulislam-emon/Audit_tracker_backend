@@ -1,206 +1,171 @@
 import QuestionRuleLink from "../models/QuestionRuleLink.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import AppError from "../utils/AppError.js";
 
-// ১. Get all question-rule links
-export const getAllQuestionRuleLinks = async (req, res) => {
-  try {
-    const { question, rule, complianceLevel, page = 1, limit = 20 } = req.query;
+// 1. Get all question-rule links
+export const getAllQuestionRuleLinks = asyncHandler(async (req, res, next) => {
+  const { question, rule, complianceLevel, page = 1, limit = 20 } = req.query;
 
-    // Build filter object
-    const filter = {};
-    if (question) filter.question = question;
-    if (rule) filter.rule = rule;
-    if (complianceLevel) filter.complianceLevel = complianceLevel;
+  // Build filter object
+  const filter = {};
+  if (question) filter.question = question;
+  if (rule) filter.rule = rule;
+  if (complianceLevel) filter.complianceLevel = complianceLevel;
 
-    const links = await QuestionRuleLink.find(filter)
-      .populate("question", "questionText section")
-      .populate("rule", "name standard code")
-      .populate("createdBy", "name email")
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit);
+  const links = await QuestionRuleLink.find(filter)
+    .populate("question", "questionText section")
+    .populate("rule", "name standard code")
+    .populate("createdBy", "name email")
+    .sort({ createdAt: -1 })
+    .limit(limit * 1)
+    .skip((page - 1) * limit);
 
-    const total = await QuestionRuleLink.countDocuments(filter);
+  const total = await QuestionRuleLink.countDocuments(filter);
 
-    res.status(200).json({
-      questionRuleLinks: links,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        totalItems: total,
-        itemsPerPage: limit,
-      },
-      message: "Question-rule links retrieved successfully",
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
+  res.status(200).json({
+    questionRuleLinks: links,
+    pagination: {
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalItems: total,
+      itemsPerPage: limit,
+    },
+    message: "Question-rule links retrieved successfully",
+  });
+});
+
+// 2. Get question-rule link by ID
+export const getQuestionRuleLinkById = asyncHandler(async (req, res, next) => {
+  const link = await QuestionRuleLink.findById(req.params.id)
+    .populate("question", "questionText section type options")
+    .populate("rule", "name standard code description category")
+    .populate("createdBy", "name email");
+
+  if (!link) {
+    throw new AppError("Question-rule link not found", 404);
   }
-};
 
-// ২. Get question-rule link by ID
-export const getQuestionRuleLinkById = async (req, res) => {
-  try {
-    const link = await QuestionRuleLink.findById(req.params.id)
-      .populate("question", "questionText section type options")
-      .populate("rule", "name standard code description category")
-      .populate("createdBy", "name email");
+  res.status(200).json({
+    questionRuleLink: link,
+    message: "Question-rule link retrieved successfully",
+  });
+});
 
-    if (!link) {
-      return res.status(404).json({ message: "Question-rule link not found" });
-    }
+// 3. Create new question-rule link
+export const createQuestionRuleLink = asyncHandler(async (req, res, next) => {
+  const { question, rule, complianceLevel, weight, reference, description } =
+    req.body;
 
-    res.status(200).json({
-      questionRuleLink: link,
-      message: "Question-rule link retrieved successfully",
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
+  if (!question || !rule) {
+    throw new AppError("Question and rule are required", 400);
   }
-};
 
-// ৩. Create new question-rule link
-export const createQuestionRuleLink = async (req, res) => {
-  try {
-    const { question, rule, complianceLevel, weight, reference, description } =
-      req.body;
+  // Check if link already exists
+  const existingLink = await QuestionRuleLink.findOne({ question, rule });
+  if (existingLink) {
+    throw new AppError("Question-rule link already exists", 400);
+  }
 
-    if (!question || !rule) {
-      return res.status(400).json({
-        message: "Question and rule are required",
-      });
-    }
+  const newLink = new QuestionRuleLink({
+    question,
+    rule,
+    complianceLevel: complianceLevel || "mandatory",
+    weight: weight || 10,
+    reference,
+    description,
+    ...createdBy(req),
+  });
 
-    // Check if link already exists
-    const existingLink = await QuestionRuleLink.findOne({ question, rule });
-    if (existingLink) {
-      return res.status(400).json({
-        message: "Question-rule link already exists",
-      });
-    }
+  const savedLink = await newLink.save();
 
-    const newLink = new QuestionRuleLink({
-      question,
-      rule,
-      complianceLevel: complianceLevel || "mandatory",
-      weight: weight || 10,
+  res.status(201).json({
+    savedQuestionRuleLink: savedLink,
+    message: "Question-rule link created successfully",
+  });
+});
+
+// 4. Update question-rule link
+export const updateQuestionRuleLink = asyncHandler(async (req, res, next) => {
+  const { complianceLevel, weight, reference, description } = req.body;
+  const linkId = req.params.id;
+
+  const updatedLink = await QuestionRuleLink.findByIdAndUpdate(
+    linkId,
+    {
+      complianceLevel,
+      weight,
       reference,
       description,
-      ...createdBy(req),
-    });
+      ...updatedBy(req),
+    },
+    { new: true, runValidators: true }
+  );
 
-    const savedLink = await newLink.save();
-
-    res.status(201).json({
-      savedQuestionRuleLink: savedLink,
-      message: "Question-rule link created successfully",
-    });
-  } catch (error) {
-    res.status(400).json({ message: "Error creating question-rule link" });
+  if (!updatedLink) {
+    throw new AppError("Question-rule link not found", 404);
   }
-};
 
-// ৪. Update question-rule link
-export const updateQuestionRuleLink = async (req, res) => {
-  try {
-    const { complianceLevel, weight, reference, description } = req.body;
+  res.status(200).json({
+    updatedQuestionRuleLink: updatedLink,
+    message: "Question-rule link updated successfully",
+  });
+});
 
-    const linkId = req.params.id;
+// 5. Delete question-rule link
+export const deleteQuestionRuleLink = asyncHandler(async (req, res, next) => {
+  const deletedLink = await QuestionRuleLink.findByIdAndDelete(req.params.id);
 
-    const updatedLink = await QuestionRuleLink.findByIdAndUpdate(
-      linkId,
-      {
-        complianceLevel,
-        weight,
-        reference,
-        description,
-        ...updatedBy(req),
-      },
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedLink) {
-      return res.status(404).json({ message: "Question-rule link not found" });
-    }
-
-    res.status(200).json({
-      updatedQuestionRuleLink: updatedLink,
-      message: "Question-rule link updated successfully",
-    });
-  } catch (error) {
-    res.status(400).json({ message: "Error updating question-rule link" });
+  if (!deletedLink) {
+    throw new AppError("Question-rule link not found", 404);
   }
-};
 
-// ৫. Delete question-rule link
-export const deleteQuestionRuleLink = async (req, res) => {
-  try {
-    const deletedLink = await QuestionRuleLink.findByIdAndDelete(req.params.id);
+  res.status(200).json({ message: "Question-rule link deleted successfully" });
+});
 
-    if (!deletedLink) {
-      return res.status(404).json({ message: "Question-rule link not found" });
-    }
+// 6. Get links by question
+export const getLinksByQuestion = asyncHandler(async (req, res, next) => {
+  const { questionId } = req.params;
 
-    res
-      .status(200)
-      .json({ message: "Question-rule link deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Error deleting question-rule link" });
-  }
-};
+  const links = await QuestionRuleLink.find({ question: questionId })
+    .populate("rule", "name standard code category")
+    .populate("createdBy", "name email")
+    .sort({ complianceLevel: -1, weight: -1 });
 
-// ৬. Get links by question
-export const getLinksByQuestion = async (req, res) => {
-  try {
-    const { questionId } = req.params;
+  res.status(200).json({
+    questionRuleLinks: links,
+    message: "Question-rule links retrieved successfully for question",
+  });
+});
 
-    const links = await QuestionRuleLink.find({ question: questionId })
-      .populate("rule", "name standard code category")
-      .populate("createdBy", "name email")
-      .sort({ complianceLevel: -1, weight: -1 });
+// 7. Get links by rule
+export const getLinksByRule = asyncHandler(async (req, res, next) => {
+  const { ruleId } = req.params;
 
-    res.status(200).json({
-      questionRuleLinks: links,
-      message: "Question-rule links retrieved successfully for question",
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
+  const links = await QuestionRuleLink.find({ rule: ruleId })
+    .populate("question", "questionText section type")
+    .populate("createdBy", "name email")
+    .sort({ weight: -1 });
 
-// ৭. Get links by rule
-export const getLinksByRule = async (req, res) => {
-  try {
-    const { ruleId } = req.params;
+  res.status(200).json({
+    questionRuleLinks: links,
+    message: "Question-rule links retrieved successfully for rule",
+  });
+});
 
-    const links = await QuestionRuleLink.find({ rule: ruleId })
-      .populate("question", "questionText section type")
-      .populate("createdBy", "name email")
-      .sort({ weight: -1 });
-
-    res.status(200).json({
-      questionRuleLinks: links,
-      message: "Question-rule links retrieved successfully for rule",
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// ৮. Bulk create question-rule links
-export const bulkCreateQuestionRuleLinks = async (req, res) => {
-  try {
+// 8. Bulk create question-rule links
+export const bulkCreateQuestionRuleLinks = asyncHandler(
+  async (req, res, next) => {
     const { links } = req.body;
 
     if (!links || !Array.isArray(links) || links.length === 0) {
-      return res.status(400).json({ message: "Links array is required" });
+      throw new AppError("Links array is required", 400);
     }
 
     // Validate each link
     for (const link of links) {
       if (!link.question || !link.rule) {
-        return res.status(400).json({
-          message: "Each link must have question and rule",
-        });
+        throw new AppError("Each link must have question and rule", 400);
       }
     }
 
@@ -215,9 +180,5 @@ export const bulkCreateQuestionRuleLinks = async (req, res) => {
       questionRuleLinks: createdLinks,
       message: `${createdLinks.length} question-rule links created successfully`,
     });
-  } catch (error) {
-    res
-      .status(400)
-      .json({ message: "Error creating question-rule links in bulk" });
   }
-};
+);

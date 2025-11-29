@@ -5,6 +5,8 @@ import { can } from "../config/permissions.js";
 import * as siteController from "../controllers/siteController.js";
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
+import { body } from "express-validator";
+import { validate } from "../middleware/validator.js";
 
 const router = Router();
 
@@ -24,6 +26,11 @@ router.post(
   "/",
   auth,
   authorizeRoles(...can("SITE", "CREATE")),
+  [
+    body("name", "Site name is required").not().isEmpty(),
+    body("company", "Company ID is required").not().isEmpty(),
+  ],
+  validate,
   siteController.createSite
 );
 router.patch(
