@@ -2,20 +2,42 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import mongoose from "mongoose";
 import config from "./config/config.js";
 import connectDB from "./config/db.js";
 // import path from 'path';
 
+// Error Handling Imports
+import globalErrorHandler from "./middleware/errorMiddleware.js";
+import AppError from "./utils/AppError.js";
+
 // Import routes
 import routes from "./routes/index.js";
+
+// Handle Uncaught Exceptions
+process.on("uncaughtException", (err) => {
+  logger.error("UNCAUGHT EXCEPTION! 💥 Shutting down...", err);
+  process.exit(1);
+});
+
 dotenv.config();
 
 const port = config.port;
 const app = express();
 
+import logger from "./utils/logger.js";
+import morgan from "morgan";
+
 // Middleware
 app.use(express.json()); // Parse JSON bodies
 app.use(cookieParser());
+
+// Request Logging
+app.use(
+  morgan("combined", {
+    stream: { write: (message) => logger.info(message.trim()) },
+  })
+);
 
 app.use(
   cors({
@@ -36,22 +58,69 @@ app.use(
   })
 );
 
+// Rate Limiting
+import { globalLimiter } from "./middleware/rateLimiter.js";
+app.use("/api", globalLimiter); // Apply to all API routes
+
 // Connect to MongoDB
 connectDB();
 
+// Routes
 app.use("/", routes);
 
-//  // Static files serve করার জন্য (uploads folder)
-// app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-
 // Health check
-app.get("/", (req, res) => {
-  res.json({
-    success: true,
+app.get("/health", (req, res) => {
+  const dbStatus =
+    mongoose.connection.readyState === 1 ? "connected" : "disconnected";
+  res.status(200).json({
+    status: "success",
     message: "Audit Tracker API is running",
     timestamp: new Date().toISOString(),
+    database: dbStatus,
+    uptime: process.uptime(),
   });
 });
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+
+// Graceful Shutdown
+const gracefulShutdown = () => {
+  logger.info("Received kill signal, shutting down gracefully");
+  server.close(() => {
+    logger.info("Closed out remaining connections");
+    mongoose.connection.close(false, () => {
+      logger.info("MongoDB connection closed");
+      process.exit(0);
+    });
+  });
+
+  // Force close server after 10 secs
+  setTimeout(() => {
+    logger.error(
+      "Could not close connections in time, forcefully shutting down"
+    );
+    process.exit(1);
+  }, 10000);
+};
+
+process.on("SIGTERM", gracefulShutdown);
+process.on("SIGINT", gracefulShutdown);
+
+// Handle Unhandled Routes
+app.use((req, res, next) => {
+  next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404));
+});
+
+// Global Error Handler Middleware
+app.use(globalErrorHandler);
+
+// Start Server
+const server = app.listen(port, () => {
+  logger.info(`Server is running on port ${port}`);
+});
+
+// Handle Unhandled Rejections
+process.on("unhandledRejection", (err) => {
+  logger.error("UNHANDLED REJECTION! 💥 Shutting down...", err);
+  server.close(() => {
+    process.exit(1);
+  });
 });
