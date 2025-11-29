@@ -3,3 +3,9 @@ node_modules/
 npm-debug.log
 .DS_Store
 # .git_disable
+
+# Log files
+*.log
+logs/
+combined.log
+error.log
