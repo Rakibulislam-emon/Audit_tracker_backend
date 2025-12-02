@@ -63,32 +63,32 @@ router.delete(
 
 // POST /api/approvals/:id/approve - Approve
 router.post(
-  "/:id/approve", 
-  auth, 
+  "/:id/approve",
+  auth,
   authorizeRoles(...can("APPROVAL", "APPROVE")),
   approvalController.approveRequest
 );
 
 // POST /api/approvals/:id/reject - Reject
 router.post(
-  "/:id/reject", 
-  auth, 
-  authorizeRoles(...can("APPROVAL", "APPROVE")),
+  "/:id/reject",
+  auth,
+  authorizeRoles(...can("APPROVAL", "REJECT")),
   approvalController.rejectRequest
 );
 
 // POST /api/approvals/:id/escalate - Escalate
 router.post(
-  "/:id/escalate", 
-  auth, 
+  "/:id/escalate",
+  auth,
   authorizeRoles(...can("APPROVAL", "APPROVE")),
   approvalController.escalateRequest
 );
 
 // PATCH /api/approvals/:id/requirement - Update requirement checklist
 router.patch(
-  "/:id/requirement", 
-  auth, 
+  "/:id/requirement",
+  auth,
   authorizeRoles(...can("APPROVAL", "UPDATE")),
   approvalController.updateRequirement
 );
@@ -103,16 +103,16 @@ router.post(
 
 // POST /api/approvals/bulk/approve - Bulk approve multiple requests
 router.post(
-  "/bulk/approve", 
-  auth, 
+  "/bulk/approve",
+  auth,
   authorizeRoles(...can("APPROVAL", "APPROVE")),
   approvalController.bulkApproveRequests
 );
 
 // POST /api/approvals/bulk/reject - Bulk reject multiple requests
 router.post(
-  "/bulk/reject", 
-  auth, 
+  "/bulk/reject",
+  auth,
   authorizeRoles(...can("APPROVAL", "APPROVE")),
   approvalController.bulkRejectRequests
 );

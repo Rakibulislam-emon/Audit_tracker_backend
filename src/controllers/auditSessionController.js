@@ -4,6 +4,7 @@ import AuditSession from "../models/AuditSession.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
+import Team from "../models/Team.js";
 
 // GET /api/audit-sessions - With filtering, sorting, population
 export const getAllAuditSessions = asyncHandler(async (req, res, next) => {
@@ -49,12 +50,38 @@ export const getAllAuditSessions = asyncHandler(async (req, res, next) => {
     query.title = searchRegex; // Search in the optional title field
   }
 
-  // Step 5: Find data, populate relationships, and sort
+  // Step 5: Apply role-based access control
+  const userRole = req.user?.role;
+  const userId = req.user?._id;
+
+  if (
+    userRole !== "admin" &&
+    userRole !== "sysadmin" &&
+    userRole !== "manager" &&
+    userRole !== "complianceOfficer"
+  ) {
+    // For non-admin users, filter sessions where they are team lead or team member
+    const userTeamSessions = await Team.find({
+      user: userId,
+      status: "active",
+    }).distinct("auditSession");
+
+    // Include sessions where user is in team, lead auditor, or auditor
+    query.$or = [
+      { _id: { $in: userTeamSessions } }, // Sessions where user is in team
+      { leadAuditor: userId }, // Sessions where user is lead auditor
+      { auditor: userId }, // Sessions where user is auditor
+    ];
+  }
+
+  // Step 6: Find data, populate relationships, and sort
   const auditSessions = await AuditSession.find(query)
     .populate("template", "title version") // Populate template details
     .populate("site", "name location") // Populate site details
     .populate("checkType", "name") // Populate checkType name (if exists)
     .populate("schedule", "title startDate endDate") // Populate schedule details
+    .populate("leadAuditor", "name email role") // Populate lead auditor
+    .populate("auditor", "name email role") // Populate auditor
     .populate({
       path: "teamMembers",
       select: "user roleInTeam",
@@ -86,6 +113,8 @@ export const getAuditSessionById = asyncHandler(async (req, res, next) => {
     .populate("site", "name location")
     .populate("checkType", "name")
     .populate("schedule", "title startDate endDate")
+    .populate("leadAuditor", "name email role") // Populate lead auditor
+    .populate("auditor", "name email role") // Populate auditor
     .populate({
       path: "teamMembers",
       select: "user roleInTeam",
@@ -120,6 +149,8 @@ export const createAuditSession = asyncHandler(async (req, res, next) => {
     site,
     checkType,
     schedule,
+    leadAuditor,
+    auditor,
   } = req.body;
 
   // Validation (Required fields from schema)
@@ -131,6 +162,14 @@ export const createAuditSession = asyncHandler(async (req, res, next) => {
     throw new AppError("End date must be after start date", 400);
   }
 
+  // Fetch schedule to get assignedUser (lead auditor)
+  const scheduleDoc = await (
+    await import("../models/Schedule.js")
+  ).default.findById(schedule);
+
+  // Auto-populate leadAuditor from schedule's assignedUser if not provided
+  const finalLeadAuditor = leadAuditor || scheduleDoc?.assignedUser || null;
+
   const newAuditSession = new AuditSession({
     title: title || null, // Handle optional title
     startDate: startDate || null, // Handle optional dates
@@ -140,11 +179,33 @@ export const createAuditSession = asyncHandler(async (req, res, next) => {
     site,
     schedule,
     checkType: checkType || null, // Handle optional checkType
+    leadAuditor: finalLeadAuditor, // Auto-populated from schedule
+    auditor: auditor || null, // Handle optional auditor
     ...createdBy(req),
     // status defaults to 'active'
   });
 
   let savedAuditSession = await newAuditSession.save(); // Mongoose validates enum, required, unique index
+
+  // Auto-create team entry for lead auditor if specified
+  if (savedAuditSession.leadAuditor) {
+    const Team = (await import("../models/Team.js")).default;
+
+    // Check if team entry already exists
+    const existingTeamEntry = await Team.findOne({
+      auditSession: savedAuditSession._id,
+      user: savedAuditSession.leadAuditor,
+    });
+
+    if (!existingTeamEntry) {
+      await Team.create({
+        auditSession: savedAuditSession._id,
+        user: savedAuditSession.leadAuditor,
+        roleInTeam: "lead",
+        ...createdBy(req),
+      });
+    }
+  }
 
   // Repopulate for response
   savedAuditSession = await AuditSession.findById(savedAuditSession._id)
@@ -152,6 +213,8 @@ export const createAuditSession = asyncHandler(async (req, res, next) => {
     .populate("site", "name location")
     .populate("checkType", "name")
     .populate("schedule", "title startDate endDate")
+    .populate("leadAuditor", "name email role")
+    .populate("auditor", "name email role")
     .populate("createdBy", "name email")
     .populate("updatedBy", "name email");
 
@@ -174,6 +237,8 @@ export const updateAuditSession = asyncHandler(async (req, res, next) => {
     site,
     checkType,
     schedule,
+    leadAuditor,
+    auditor,
     status,
   } = req.body;
   const auditSessionId = req.params.id;
@@ -196,6 +261,8 @@ export const updateAuditSession = asyncHandler(async (req, res, next) => {
   if (site) updateData.site = site; // Change site? Maybe restrict this.
   if (checkType !== undefined) updateData.checkType = checkType; // Allow setting/unsetting
   if (schedule) updateData.schedule = schedule; // Change schedule? Maybe restrict.
+  if (leadAuditor !== undefined) updateData.leadAuditor = leadAuditor; // Allow setting/unsetting lead auditor
+  if (auditor !== undefined) updateData.auditor = auditor; // Allow setting/unsetting auditor
   if (status === "active" || status === "inactive") updateData.status = status;
 
   let updatedAuditSession = await AuditSession.findByIdAndUpdate(
@@ -214,6 +281,8 @@ export const updateAuditSession = asyncHandler(async (req, res, next) => {
     .populate("site", "name location")
     .populate("checkType", "name")
     .populate("schedule", "title startDate endDate")
+    .populate("leadAuditor", "name email role")
+    .populate("auditor", "name email role")
     .populate("createdBy", "name email")
     .populate("updatedBy", "name email");
 

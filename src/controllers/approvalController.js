@@ -342,7 +342,13 @@ const canUserApprove = (approval, user) => {
     return true;
   }
 
-  // RULE 2: Escalation path for overdue approvals (manager+ roles)
+  // RULE 2: Compliance Officer has final authority on all approvals
+  if (user.role === "complianceOfficer") {
+    console.log(`✅ Compliance Officer review - final authority`);
+    return true;
+  }
+
+  // RULE 3: Escalation path for overdue approvals (manager+ roles)
   const isOverdue =
     approval.timeline?.deadline &&
     new Date() > new Date(approval.timeline.deadline);
@@ -351,7 +357,7 @@ const canUserApprove = (approval, user) => {
     return true;
   }
 
-  // RULE 3: Emergency override for critical items (sysadmin only)
+  // RULE 4: Emergency override for critical items (sysadmin only)
   if (approval.priority === "critical" && user.role === "sysadmin") {
     console.log(`✅ Emergency override by sysadmin for critical approval`);
     return true;
