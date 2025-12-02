@@ -343,6 +343,7 @@ export const startScheduleAudits = asyncHandler(async (req, res, next) => {
     site: schedule.site._id,
     checkType: schedule.program.template.checkType,
     workflowStatus: "planned",
+    leadAuditor: schedule.assignedUser?._id || schedule.assignedUser || null, // ✅ Set lead auditor
     status: "active",
     ...createdBy(req),
   });
