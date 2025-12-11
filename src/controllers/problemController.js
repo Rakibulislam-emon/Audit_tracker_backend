@@ -53,6 +53,48 @@ export const getAllProblems = asyncHandler(async (req, res, next) => {
     query.$or = [{ title: searchRegex }, { description: searchRegex }];
   }
 
+  // Step 4.1: Role-based filtering
+  const userRole = req.user?.role;
+  const userId = req.user?._id;
+
+  console.log("🔍 Problem Filter Debug:", {
+    userRole,
+    userId,
+    auditSession: query.auditSession,
+  });
+
+  // If user is an auditor, restricting visibility
+  if (userRole?.toLowerCase() === "auditor") {
+    let isLead = false;
+
+    // Check if they are Lead Auditor for the requested session
+    if (query.auditSession) {
+      const session = await (
+        await import("../models/AuditSession.js")
+      ).default.findById(query.auditSession);
+
+      if (
+        session?.leadAuditor &&
+        session.leadAuditor.toString() === userId.toString()
+      ) {
+        isLead = true;
+      }
+
+      console.log("🔍 Session Lead Check:", {
+        sessionId: query.auditSession,
+        sessionFound: !!session,
+        leadAuditor: session?.leadAuditor,
+        isLead,
+      });
+    }
+
+    // If not lead auditor (or no session specified), only show their own problems
+    if (!isLead) {
+      query.createdBy = userId;
+      console.log("🔒 Restricted to creator:", userId);
+    }
+  }
+
   // Step 5: Find data, populate relationships, and sort
   const problems = await Problem.find(query)
     .populate("auditSession", "title")
@@ -242,13 +284,39 @@ export const updateProblem = asyncHandler(async (req, res, next) => {
 
 // DELETE /api/problems/:id - Standard response
 export const deleteProblem = asyncHandler(async (req, res, next) => {
-  const deletedProblem = await Problem.findByIdAndDelete(req.params.id);
-  if (!deletedProblem) {
+  const problem = await Problem.findById(req.params.id);
+
+  if (!problem) {
     throw new AppError("Problem not found", 404);
   }
+
+  // 🔒 Permission Check
+  const userId = req.user._id.toString();
+  const userRole = req.user.role;
+
+  const isCreator = problem.createdBy.toString() === userId;
+  const isAdmin = ["admin", "sysadmin"].includes(userRole);
+
+  // Check if Lead Auditor
+  let isLead = false;
+  if (!isCreator && !isAdmin) {
+    const session = await (
+      await import("../models/AuditSession.js")
+    ).default.findById(problem.auditSession);
+    if (session?.leadAuditor && session.leadAuditor.toString() === userId) {
+      isLead = true;
+    }
+  }
+
+  if (!isCreator && !isAdmin && !isLead) {
+    throw new AppError("You are not authorized to delete this problem", 403);
+  }
+
+  await problem.deleteOne();
+
   res.status(200).json({
     message: "Problem deleted successfully",
     success: true,
-    data: deletedProblem,
+    data: problem,
   });
 });

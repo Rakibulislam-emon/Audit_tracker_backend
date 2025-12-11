@@ -21,7 +21,9 @@ import siteRoutes from "./siteRoutes.js";
 import teamRoutes from "./teamRoutes.js";
 import templateRoutes from "./templateRoutes.js";
 import userRoutes from "./userRoutes.js";
+// ... existing imports
 import dashboardRoutes from "./dashboardRoutes.js";
+import questionAssignmentRoutes from "./questionAssignmentRoutes.js";
 
 router.use("/api/users", userRoutes);
 
@@ -48,5 +50,6 @@ router.use("/api/approvals", approvalRoutes);
 
 router.use("/api/dashboard", dashboardRoutes);
 router.use("/api/metrics", metricRoutes);
+router.use("/api/question-assignments", questionAssignmentRoutes);
 
 export default router;
