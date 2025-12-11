@@ -45,6 +45,25 @@ const UserSchema = new mongoose.Schema(
       default: "auditor",
       required: true,
     },
+
+    // ===== User Scoping (for data access control) =====
+    scopeLevel: {
+      type: String,
+      enum: ["system", "group", "company", "site"],
+      default: "system",
+    },
+    assignedGroup: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Group",
+    },
+    assignedCompany: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+    },
+    assignedSite: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Site",
+    },
     isActive: {
       type: Boolean,
       default: true,

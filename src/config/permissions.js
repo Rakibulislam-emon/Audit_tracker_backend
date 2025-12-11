@@ -6,7 +6,7 @@ export const ROLES = {
   ADMIN: "admin",
   COMPLIANCE_OFFICER: "complianceOfficer",
   MANAGER: "manager",
-  
+
   // ===== NEW ROLES (for system refactor) =====
   AUDITOR: "auditor",
   SUPER_ADMIN: "superAdmin",
@@ -196,7 +196,7 @@ export const PERMISSIONS = {
       ROLES.COMPLIANCE_OFFICER,
     ],
     CREATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.AUDITOR],
-    UPDATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER],
+    UPDATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.AUDITOR],
     DELETE: [ROLES.SYSADMIN, ROLES.ADMIN],
   },
 
