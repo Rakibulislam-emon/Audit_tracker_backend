@@ -99,7 +99,7 @@ const loginUser = asyncHandler(async (req, res, next) => {
 // @route GET /api/users
 // @access Private
 const getAllUsers = asyncHandler(async (req, res, next) => {
-  const { search, role, status } = req.query;
+  const { search, role, status, group, company, site } = req.query;
 
   let filter = {};
 
@@ -111,10 +111,21 @@ const getAllUsers = asyncHandler(async (req, res, next) => {
     ];
   }
 
-  // Role filter
+  // Role filter (support single or multiple)
   if (role) {
-    filter.role = role;
+    // If role involves comma-separated string or array
+    const roles = Array.isArray(role) ? role : role.split(",");
+    if (roles.length > 1) {
+      filter.role = { $in: roles };
+    } else {
+      filter.role = roles[0];
+    }
   }
+
+  // Scope filters
+  if (group) filter.assignedGroup = group;
+  if (company) filter.assignedCompany = company;
+  if (site) filter.assignedSite = site;
 
   // Status filter
   if (status === "active") {
