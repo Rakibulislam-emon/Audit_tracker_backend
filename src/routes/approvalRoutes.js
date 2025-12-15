@@ -85,9 +85,9 @@ router.post(
   approvalController.escalateRequest
 );
 
-// PATCH /api/approvals/:id/requirement - Update requirement checklist
-router.patch(
-  "/:id/requirement",
+// PUT /api/approvals/:id/requirements - Update requirement checklist (Synced with Frontend)
+router.put(
+  "/:id/requirements",
   auth,
   authorizeRoles(...can("APPROVAL", "UPDATE")),
   approvalController.updateRequirement

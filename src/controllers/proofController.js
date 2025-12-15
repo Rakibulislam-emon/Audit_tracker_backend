@@ -12,23 +12,38 @@ export const uploadProof = asyncHandler(async (req, res, next) => {
     throw new AppError("No file uploaded", 400);
   }
 
-  const { fixAction, caption } = req.body;
+  const { fixAction, problem, caption } = req.body;
 
-  // Step 1: Get complete FixAction data
-  const fixActionData = await FixAction.findById(fixAction)
-    .populate("problem", "title description severity")
-    .populate("observation", "questionText severity answer")
-    .populate("owner", "name email");
-
-  if (!fixActionData) {
-    // Cleanup Cloudinary file if FixAction not found
+  // Validation: Must have either fixAction OR problem
+  if (!fixAction && !problem) {
+    // Cleanup upload
     if (req.file?.filename) {
-      await cloudinary.uploader.destroy(req.file.filename, {
-        resource_type: req.file.resource_type || "auto",
-      });
+      await cloudinary.uploader.destroy(req.file.filename);
     }
-    throw new AppError("Fix Action not found in database.", 404);
+    throw new AppError("Proof must be linked to a Problem or Fix Action.", 400);
   }
+
+  let fixActionData = null;
+  let problemId = problem;
+  let observationId = null;
+
+  // Case A: Linked to FixAction (inherit related IDs)
+  if (fixAction) {
+    fixActionData = await FixAction.findById(fixAction)
+      .populate("problem", "title")
+      .populate("observation", "_id");
+
+    if (!fixActionData) {
+      if (req.file?.filename)
+        await cloudinary.uploader.destroy(req.file.filename);
+      throw new AppError("Fix Action not found.", 404);
+    }
+    problemId = fixActionData.problem?._id;
+    observationId = fixActionData.observation?._id;
+  }
+
+  // Case B: Linked directly to Problem (if not already derived)
+  // Note: If problem passed in body, it overrides or complements.
 
   // Step 2: Create Proof with related IDs
   const file = req.file;
@@ -39,9 +54,9 @@ export const uploadProof = asyncHandler(async (req, res, next) => {
   );
 
   const newProof = new Proof({
-    fixAction: fixActionData._id,
-    problem: fixActionData.problem?._id || null,
-    observation: fixActionData.observation?._id || null,
+    fixAction: fixAction || null,
+    problem: problemId || null,
+    observation: observationId || null,
     fileType: fileType,
     originalName: file.originalname,
     caption: caption || "",

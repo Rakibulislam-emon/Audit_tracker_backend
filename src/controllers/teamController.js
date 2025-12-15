@@ -75,6 +75,25 @@ export const createTeam = asyncHandler(async (req, res, next) => {
     );
   }
 
+  // 🔒 Security Check: Only Lead Auditor or Admin can add members
+  const session = await (
+    await import("../models/AuditSession.js")
+  ).default.findById(auditSession);
+  if (!session) {
+    throw new AppError("Audit session not found", 404);
+  }
+
+  const isLeadAuditor =
+    session.leadAuditor &&
+    session.leadAuditor.toString() === req.user._id.toString();
+  const isAdmin = req.user.role === "admin" || req.user.role === "sysadmin";
+
+  if (!isLeadAuditor && !isAdmin) {
+    return next(
+      new AppError("Only the Lead Auditor or Admin can add team members.", 403)
+    );
+  }
+
   const newTeam = new Team({
     auditSession,
     user,
@@ -144,13 +163,37 @@ export const updateTeam = asyncHandler(async (req, res, next) => {
 
 // DELETE /api/teams/:id - Update response format
 export const deleteTeam = asyncHandler(async (req, res, next) => {
-  const deletedTeam = await Team.findByIdAndDelete(req.params.id);
-  if (!deletedTeam) {
+  const teamMember = await Team.findById(req.params.id);
+
+  if (!teamMember) {
     throw new AppError("Team assignment not found", 404);
   }
+
+  // 🔒 Security Check
+  const session = await (
+    await import("../models/AuditSession.js")
+  ).default.findById(teamMember.auditSession);
+  if (session) {
+    const isLeadAuditor =
+      session.leadAuditor &&
+      session.leadAuditor.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === "admin" || req.user.role === "sysadmin";
+
+    if (!isLeadAuditor && !isAdmin) {
+      return next(
+        new AppError(
+          "Only the Lead Auditor or Admin can remove team members.",
+          403
+        )
+      );
+    }
+  }
+
+  await teamMember.deleteOne();
+
   res.status(200).json({
     message: "Team assignment deleted successfully",
     success: true,
-    data: deletedTeam,
+    data: teamMember,
   });
 });

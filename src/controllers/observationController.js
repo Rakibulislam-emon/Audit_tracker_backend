@@ -1,6 +1,7 @@
 // src/controllers/observationController.js
 
 import Observation from "../models/Observation.js";
+import QuestionAssignment from "../models/QuestionAssignment.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
@@ -103,6 +104,28 @@ export const createObservation = asyncHandler(async (req, res, next) => {
     );
   }
 
+  // ✅ Check for Question Assignment
+  if (question) {
+    const assignment = await QuestionAssignment.findOne({
+      auditSession,
+      question,
+    });
+
+    if (assignment) {
+      // Check if current user is the assignee (or admin/sysadmin override)
+      const isAssignedUser =
+        assignment.assignedTo.toString() === req.user._id.toString();
+      const isAdmin = ["admin", "sysadmin"].includes(req.user.role);
+
+      if (!isAssignedUser && !isAdmin) {
+        throw new AppError(
+          "You are not assigned to answer this question.",
+          403
+        );
+      }
+    }
+  }
+
   const newObservation = new Observation({
     auditSession,
     question: question || null,
@@ -164,6 +187,37 @@ export const updateObservation = asyncHandler(async (req, res, next) => {
   if (status === "active" || status === "inactive") updateData.status = status;
   if (resolutionStatus) updateData.resolutionStatus = resolutionStatus;
   if (problem !== undefined) updateData.problem = problem || null;
+
+  // ✅ Check for Question Assignment (for updates)
+  // We need to know the session and question to check assignment.
+  // If not provided in body, we might need to fetch from existing observation,
+  // but efficient way is to assume frontend sends them or we verify against existing.
+
+  // Fetch existing to ensure we have the correct session/question for checking
+  const existingObservation = await Observation.findById(observationId);
+  if (!existingObservation) {
+    throw new AppError("Observation not found", 404);
+  }
+
+  const targetSession = auditSession || existingObservation.auditSession;
+  const targetQuestion = question || existingObservation.question;
+
+  if (targetQuestion) {
+    const assignment = await QuestionAssignment.findOne({
+      auditSession: targetSession,
+      question: targetQuestion,
+    });
+
+    if (assignment) {
+      const isAssignedUser =
+        assignment.assignedTo.toString() === req.user._id.toString();
+      const isAdmin = ["admin", "sysadmin"].includes(req.user.role);
+
+      if (!isAssignedUser && !isAdmin) {
+        throw new AppError("You are not assigned to modify this answer.", 403);
+      }
+    }
+  }
 
   let updatedObservation = await Observation.findByIdAndUpdate(
     observationId,

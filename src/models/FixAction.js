@@ -39,6 +39,27 @@ const fixActionSchema = new mongoose.Schema(
       },
       default: "Pending",
     },
+
+    // ===== CAPA FIELDS =====
+    rootCause: {
+      // Root Cause Analysis: Why did the problem occur?
+      type: String,
+      trim: true,
+      required: false, // Optional initially, may require upon submission
+    },
+    correctiveAction: {
+      // Corrective Action: Fix for this specific instance
+      type: String,
+      trim: true,
+      required: false,
+    },
+    preventiveAction: {
+      // Preventive Action: Prevent recurrence in the future
+      type: String,
+      trim: true,
+      required: false,
+    },
+
     reviewNotes: {
       // Notes from reviewer/verifier
       type: String,

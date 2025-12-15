@@ -335,10 +335,16 @@ export const deleteApproval = async (req, res) => {
 const canUserApprove = (approval, user) => {
   // RULE 1: Assigned approver can always act
   const isAssignedApprover =
-    approval.approver.toString() === user.id?.toString() ||
-    approval.approver.toString() === user._id?.toString();
+    approval.approver?.toString() === user.id?.toString() ||
+    approval.approver?.toString() === user._id?.toString();
 
   if (isAssignedApprover) {
+    return true;
+  }
+
+  // RULE 1.5: Admins and SysAdmins have superuser approval authority
+  if (["admin", "sysadmin"].includes(user.role)) {
+    console.log(`✅ Admin/SysAdmin override for approval`);
     return true;
   }
 
@@ -348,18 +354,19 @@ const canUserApprove = (approval, user) => {
     return true;
   }
 
-  // RULE 3: Escalation path for overdue approvals (manager+ roles)
+  // RULE 3: Escalation path for overdue approvals (manager role)
   const isOverdue =
     approval.timeline?.deadline &&
     new Date() > new Date(approval.timeline.deadline);
-  if (isOverdue && ["admin", "sysadmin", "manager"].includes(user.role)) {
-    console.log(`✅ Escalation approval by ${user.role} for overdue request`);
-    return true;
+
+  // Managers can approve if overdue OR if unassigned (pool)
+  if (user.role === "manager") {
+    if (isOverdue) return true;
+    if (!approval.approver) return true; // Unassigned
   }
 
-  // RULE 4: Emergency override for critical items (sysadmin only)
+  // RULE 4: Emergency override for critical items (sysadmin only) - Redundant now but keeping for clarity
   if (approval.priority === "critical" && user.role === "sysadmin") {
-    console.log(`✅ Emergency override by sysadmin for critical approval`);
     return true;
   }
 
@@ -633,6 +640,19 @@ export const getMyApprovals = async (req, res) => {
     }
 
     const filter = { approver: userId };
+
+    // If user is Manager or Admin/Sysadmin, also show unassigned approvals
+    const privilegedRoles = ["manager", "admin", "sysadmin"];
+    if (privilegedRoles.includes(req.user?.role)) {
+      // Show assigned to me OR unassigned
+      delete filter.approver;
+      filter.$or = [
+        { approver: userId },
+        { approver: null },
+        { approver: { $exists: false } },
+      ];
+    }
+
     if (approvalStatus) filter.approvalStatus = approvalStatus;
 
     const approvals = await Approval.find(filter)

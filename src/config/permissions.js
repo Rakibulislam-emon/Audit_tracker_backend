@@ -1,11 +1,20 @@
 // config/permissions.js
 
 export const ROLES = {
+  // ===== OLD ROLES (keep for backward compatibility) =====
   SYSADMIN: "sysadmin",
   ADMIN: "admin",
   COMPLIANCE_OFFICER: "complianceOfficer",
   MANAGER: "manager",
+
+  // ===== NEW ROLES (for system refactor) =====
   AUDITOR: "auditor",
+  SUPER_ADMIN: "superAdmin",
+  GROUP_ADMIN: "groupAdmin",
+  COMPANY_ADMIN: "companyAdmin",
+  SITE_MANAGER: "siteManager",
+  PROBLEM_OWNER: "problemOwner",
+  APPROVER: "approver",
 };
 
 // Action-based permissions for each module
@@ -132,7 +141,7 @@ export const PERMISSIONS = {
     CREATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER],
     UPDATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER],
     DELETE: [ROLES.SYSADMIN, ROLES.ADMIN],
-    START: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER],
+    // Note: START permission handled by authorizeLeadAuditor middleware
   },
 
   // Audit Sessions
@@ -187,8 +196,8 @@ export const PERMISSIONS = {
       ROLES.COMPLIANCE_OFFICER,
     ],
     CREATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.AUDITOR],
-    UPDATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER],
-    DELETE: [ROLES.SYSADMIN, ROLES.ADMIN],
+    UPDATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.AUDITOR],
+    DELETE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.AUDITOR],
   },
 
   // Fix Actions
@@ -200,8 +209,22 @@ export const PERMISSIONS = {
       ROLES.AUDITOR,
       ROLES.COMPLIANCE_OFFICER,
     ],
-    CREATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER],
-    UPDATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER],
+    CREATE: [
+      ROLES.SYSADMIN,
+      ROLES.ADMIN,
+      ROLES.MANAGER,
+      ROLES.AUDITOR,
+      ROLES.SITE_MANAGER,
+      ROLES.PROBLEM_OWNER,
+    ],
+    UPDATE: [
+      ROLES.SYSADMIN,
+      ROLES.ADMIN,
+      ROLES.MANAGER,
+      ROLES.AUDITOR,
+      ROLES.SITE_MANAGER,
+      ROLES.PROBLEM_OWNER,
+    ],
     DELETE: [ROLES.SYSADMIN, ROLES.ADMIN],
   },
 
@@ -244,12 +267,13 @@ export const PERMISSIONS = {
       ROLES.COMPLIANCE_OFFICER,
     ],
     CREATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER],
-    UPDATE: [ROLES.SYSADMIN, ROLES.ADMIN ,ROLES.COMPLIANCE_OFFICER],
+    UPDATE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.COMPLIANCE_OFFICER],
     DELETE: [ROLES.SYSADMIN, ROLES.ADMIN],
-    APPROVE: [ROLES.SYSADMIN,ROLES.ADMIN, ROLES.COMPLIANCE_OFFICER], // Admin only for override
+    APPROVE: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.COMPLIANCE_OFFICER], // Admin only for override
     REJECT: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.COMPLIANCE_OFFICER], // Admin only for override
   },
 
+  // ... existing permissions
   // Metrics
   METRIC: {
     VIEW: [
@@ -258,6 +282,19 @@ export const PERMISSIONS = {
       ROLES.MANAGER,
       ROLES.COMPLIANCE_OFFICER,
     ],
+  },
+
+  // Question Assignments
+  QUESTION_ASSIGNMENT: {
+    VIEW: [
+      ROLES.SYSADMIN,
+      ROLES.ADMIN,
+      ROLES.MANAGER,
+      ROLES.AUDITOR,
+      ROLES.COMPLIANCE_OFFICER,
+    ],
+    ASSIGN: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.AUDITOR],
+    UNASSIGN: [ROLES.SYSADMIN, ROLES.ADMIN, ROLES.MANAGER, ROLES.AUDITOR],
   },
 };
 

@@ -86,6 +86,11 @@ export const getFixActionById = asyncHandler(async (req, res, next) => {
   });
 });
 
+import Approval from "../models/Approval.js";
+import { resolveApproverByBusinessRules } from "../utils/approvalResolver.js";
+
+// ... [existing imports]
+
 // POST /api/fix-actions - Include new fields, updated error handling, link to Problem
 export const createFixAction = asyncHandler(async (req, res, next) => {
   const {
@@ -96,33 +101,82 @@ export const createFixAction = asyncHandler(async (req, res, next) => {
     actionStatus,
     reviewNotes,
     verificationMethod,
+    rootCause,
+    correctiveAction,
+    preventiveAction,
   } = req.body;
 
   // Validation
-  if (!problem || !actionText || !owner || !deadline) {
-    throw new AppError(
-      "Problem, Action Text, Owner, and Deadline are required",
-      400
-    );
+  if (!problem || !owner || !deadline) {
+    throw new AppError("Problem, Owner, and Deadline are required", 400);
   }
 
   const newFixAction = new FixAction({
     problem,
-    actionText,
+    actionText: actionText || `Fix for Problem ${problem}`,
     owner,
     deadline,
     actionStatus: actionStatus || "Pending",
     reviewNotes,
     verificationMethod,
+    rootCause,
+    correctiveAction,
+    preventiveAction,
     ...createdBy(req),
   });
 
   let savedFixAction = await newFixAction.save();
 
-  // Link this FixAction back to the Problem document
+  // 1. Link this FixAction back to the Problem document
+  // 2. Update Problem Status to 'fix_submitted'
   await Problem.findByIdAndUpdate(problem, {
     $addToSet: { fixActions: savedFixAction._id },
+    $set: { problemStatus: "fix_submitted" },
   });
+
+  // 3. Create an Approval Request for this Fix Action
+  try {
+    // Use the standard resolver to find the right approver
+    const approverId = await resolveApproverByBusinessRules(
+      { title: actionText }, // Fake report object for Title logging
+      req.user._id,
+      req
+    );
+
+    const approval = new Approval({
+      entityType: "FixAction",
+      entityId: savedFixAction._id,
+      title: `Approval for CAPA: ${actionText || "Fix Action"}`,
+      description: `Review corrective/preventive actions for problem: ${problem}`,
+      requestedBy: req.user._id,
+      approver: approverId, // Explicitly assign approver
+      status: "active", // FIXED: 'status' must be 'active' or 'inactive'. 'approvalStatus' is 'pending'.
+      approvalStatus: "pending", // Ensure this enum is set
+      priority: "high",
+      requirements: [
+        { description: "Manager functional review", completed: false },
+      ],
+      timeline: {
+        requestedAt: new Date(),
+        deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      },
+      ...createdBy(req), // Add creator metadata
+    });
+
+    // Add initial history
+    approval.reviewHistory.push({
+      reviewedBy: req.user._id,
+      action: "submitted",
+      comments: "CAPA submitted for approval",
+      reviewedAt: new Date(),
+    });
+
+    await approval.save();
+  } catch (err) {
+    console.error("Failed to auto-create approval:", err);
+    // Don't fail the request, just log it.
+    // In prod, might want to rollback or alert.
+  }
 
   // Repopulate for response
   savedFixAction = await FixAction.findById(savedFixAction._id)
