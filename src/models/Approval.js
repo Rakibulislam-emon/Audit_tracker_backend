@@ -56,7 +56,7 @@ const approvalSchema = new mongoose.Schema(
     approver: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false, // Changed from true to allow unassigned/pool approvals
     },
 
     requestedBy: {

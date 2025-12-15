@@ -26,7 +26,7 @@ export const globalLimiter = rateLimit({
 // Auth Limiter: Applied to sensitive routes (login, register)
 // Allow 5 requests per 15 minutes to prevent password guessing (or 1000 in dev)
 export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 1 * 60 * 1000, // 15 minutes
   max: isDev ? 1000 : 5, // Limit each IP to 5 login/register attempts per windowMs
   standardHeaders: true,
   legacyHeaders: false,
