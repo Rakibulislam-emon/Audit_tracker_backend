@@ -63,6 +63,16 @@ const problemSchema = new mongoose.Schema(
       default: "Medium",
       required: [true, "Risk rating is required."],
     },
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    proofs: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Proof", // Assuming Proof model exists or will exist
+      },
+    ],
     problemStatus: {
       // Status of resolving the problem
       type: String,

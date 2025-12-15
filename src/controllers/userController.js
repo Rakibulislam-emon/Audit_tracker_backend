@@ -8,7 +8,16 @@ import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
 
 const registerUser = asyncHandler(async (req, res, next) => {
-  const { name, email, password, role } = req.body;
+  const {
+    name,
+    email,
+    password,
+    role,
+    assignTo,
+    assignedGroup,
+    assignedCompany,
+    assignedSite,
+  } = req.body;
 
   // Check if user exists
   const existingUser = await User.findOne({ email });
@@ -16,12 +25,22 @@ const registerUser = asyncHandler(async (req, res, next) => {
     throw new AppError("User already exists with this email", 400);
   }
 
+  // Auto-set scopeLevel based on assignTo
+  let scopeLevel = "system"; // default
+  if (assignTo === "group") scopeLevel = "group";
+  else if (assignTo === "company") scopeLevel = "company";
+  else if (assignTo === "site") scopeLevel = "site";
+
   // Create new user
   const user = new User({
     name,
     email,
     password,
     role: role || "auditor",
+    scopeLevel,
+    assignedGroup,
+    assignedCompany,
+    assignedSite,
   });
 
   await user.save();
@@ -32,6 +51,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
     name: user.name,
     email: user.email,
     role: user.role,
+    scopeLevel: user.scopeLevel,
     message: "User registered successfully",
   });
 });
@@ -79,7 +99,7 @@ const loginUser = asyncHandler(async (req, res, next) => {
 // @route GET /api/users
 // @access Private
 const getAllUsers = asyncHandler(async (req, res, next) => {
-  const { search, role, status } = req.query;
+  const { search, role, status, group, company, site } = req.query;
 
   let filter = {};
 
@@ -91,10 +111,21 @@ const getAllUsers = asyncHandler(async (req, res, next) => {
     ];
   }
 
-  // Role filter
+  // Role filter (support single or multiple)
   if (role) {
-    filter.role = role;
+    // If role involves comma-separated string or array
+    const roles = Array.isArray(role) ? role : role.split(",");
+    if (roles.length > 1) {
+      filter.role = { $in: roles };
+    } else {
+      filter.role = roles[0];
+    }
   }
+
+  // Scope filters
+  if (group) filter.assignedGroup = group;
+  if (company) filter.assignedCompany = company;
+  if (site) filter.assignedSite = site;
 
   // Status filter
   if (status === "active") {
@@ -103,8 +134,12 @@ const getAllUsers = asyncHandler(async (req, res, next) => {
     filter.isActive = false;
   }
 
-  // Get users with projection (exclude password)
-  const users = await User.find(filter).select("-password");
+  // Get users with projection (exclude password) and populate scope fields
+  const users = await User.find(filter)
+    .select("-password")
+    .populate("assignedGroup", "name")
+    .populate("assignedCompany", "name")
+    .populate("assignedSite", "name");
 
   res.json({
     success: true,
@@ -117,7 +152,11 @@ const getAllUsers = asyncHandler(async (req, res, next) => {
 // @route GET /api/users/:id
 // @access Private
 const getUserById = asyncHandler(async (req, res, next) => {
-  const user = await User.findById(req.params.id).select("-password");
+  const user = await User.findById(req.params.id)
+    .select("-password")
+    .populate("assignedGroup", "name")
+    .populate("assignedCompany", "name")
+    .populate("assignedSite", "name");
 
   if (!user) {
     throw new AppError("User not found", 404);
@@ -150,6 +189,21 @@ const updateUser = asyncHandler(async (req, res, next) => {
   user.name = req.body.name || user.name;
   user.email = req.body.email || user.email;
   user.role = req.body.role || user.role;
+
+  // Auto-set scopeLevel based on assignTo if provided
+  if (req.body.assignTo) {
+    if (req.body.assignTo === "group") user.scopeLevel = "group";
+    else if (req.body.assignTo === "company") user.scopeLevel = "company";
+    else if (req.body.assignTo === "site") user.scopeLevel = "site";
+  }
+
+  // Update scope assignments
+  if (req.body.assignedGroup !== undefined)
+    user.assignedGroup = req.body.assignedGroup;
+  if (req.body.assignedCompany !== undefined)
+    user.assignedCompany = req.body.assignedCompany;
+  if (req.body.assignedSite !== undefined)
+    user.assignedSite = req.body.assignedSite;
 
   // Convert string to boolean if present
   if (req.body.isActive !== undefined) {
