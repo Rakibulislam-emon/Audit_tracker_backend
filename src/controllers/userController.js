@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
+import { validateAuthority } from "../utils/authority.js";
 
 const registerUser = asyncHandler(async (req, res, next) => {
   const {
@@ -25,6 +26,26 @@ const registerUser = asyncHandler(async (req, res, next) => {
     throw new AppError("User already exists with this email", 400);
   }
 
+  // INTELLIGENT AUTO-FILL: Fill anchors from requester if missing
+  const finalAssignedGroup =
+    assignedGroup ||
+    (req.user.assignedGroup ? req.user.assignedGroup.toString() : null);
+  const finalAssignedCompany =
+    assignedCompany ||
+    (req.user.assignedCompany ? req.user.assignedCompany.toString() : null);
+  const finalAssignedSite =
+    assignedSite ||
+    (req.user.assignedSite ? req.user.assignedSite.toString() : null);
+
+  // Authority Validation
+  validateAuthority(req.user, {
+    role: role || "auditor",
+    scopeLevel: assignTo, // assignTo determines the scope level
+    assignedGroup: finalAssignedGroup,
+    assignedCompany: finalAssignedCompany,
+    assignedSite: finalAssignedSite,
+  });
+
   // Auto-set scopeLevel based on assignTo
   let scopeLevel = "system"; // default
   if (assignTo === "group") scopeLevel = "group";
@@ -38,9 +59,9 @@ const registerUser = asyncHandler(async (req, res, next) => {
     password,
     role: role || "auditor",
     scopeLevel,
-    assignedGroup,
-    assignedCompany,
-    assignedSite,
+    assignedGroup: finalAssignedGroup,
+    assignedCompany: finalAssignedCompany,
+    assignedSite: finalAssignedSite,
   });
 
   await user.save();
@@ -91,6 +112,10 @@ const loginUser = asyncHandler(async (req, res, next) => {
     name: user.name,
     email: user.email,
     role: user.role,
+    scopeLevel: user.scopeLevel,
+    assignedGroup: user.assignedGroup,
+    assignedCompany: user.assignedCompany,
+    assignedSite: user.assignedSite,
     token,
   });
 });

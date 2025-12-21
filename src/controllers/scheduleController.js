@@ -103,14 +103,21 @@ export const createSchedule = asyncHandler(async (req, res, next) => {
     purpose,
   } = req.body;
 
-  if (!title || !startDate || !endDate || !company) {
+  // INTELLIGENT AUTO-FILL: Fill company from requester if missing (for jailed admins)
+  const finalCompany =
+    company ||
+    (req.user.assignedCompany ? req.user.assignedCompany.toString() : null);
+
+  if (!title || !startDate || !endDate || !finalCompany) {
     throw new AppError(
       "Title, Start Date, End Date, and Company are required",
       400
     );
   }
-  if (new Date(endDate) <= new Date(startDate)) {
-    throw new AppError("End date must be after start date", 400);
+
+  // ALLOW same-day audits (endDate >= startDate)
+  if (new Date(endDate) < new Date(startDate)) {
+    throw new AppError("End date cannot be before start date", 400);
   }
 
   let createdSchedules = [];
@@ -129,7 +136,7 @@ export const createSchedule = asyncHandler(async (req, res, next) => {
         title: `${title} - ${siteItem.name}`,
         startDate,
         endDate,
-        company,
+        company: finalCompany,
         program: program || null,
         scheduleStatus: scheduleStatus || "scheduled",
         site: siteItem._id,
@@ -150,7 +157,7 @@ export const createSchedule = asyncHandler(async (req, res, next) => {
       title,
       startDate,
       endDate,
-      company,
+      company: finalCompany,
       program: program || null,
       scheduleStatus: scheduleStatus || "scheduled",
       site,

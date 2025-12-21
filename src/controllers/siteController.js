@@ -1,9 +1,9 @@
-// src/controllers/siteController.js
-
 import Site from "../models/Site.js";
+import Company from "../models/Company.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
+import { validateEntityCreation } from "../utils/authority.js";
 
 // GET /api/sites - Filtering, Sorting, Population
 export const getAllSites = asyncHandler(async (req, res, next) => {
@@ -68,14 +68,30 @@ export const getSiteById = asyncHandler(async (req, res, next) => {
 export const createSite = asyncHandler(async (req, res, next) => {
   const { name, location, company } = req.body;
 
-  if (!name || !company) {
+  // INTELLIGENT AUTO-FILL: Fill company from requester if missing (for jailed admins)
+  const finalCompany =
+    company ||
+    (req.user.assignedCompany ? req.user.assignedCompany.toString() : null);
+
+  if (!name || !finalCompany) {
     throw new AppError("Name and company are required", 400);
   }
+
+  // Authority Validation
+  const targetCompany = await Company.findById(finalCompany);
+  if (!targetCompany) {
+    throw new AppError("Target company not found", 404);
+  }
+
+  validateEntityCreation(req.user, "site", {
+    company: finalCompany,
+    group: targetCompany.group, // Pass group of the company for Group Admin validation
+  });
 
   const newSite = new Site({
     name,
     location,
-    company,
+    company: finalCompany,
     ...createdBy(req),
   });
   let savedSite = await newSite.save();

@@ -30,10 +30,10 @@ const UserSchema = new mongoose.Schema(
         // Old roles (keep for backward compatibility)
         "admin",
         "manager",
-        "complianceOfficer",
         "sysadmin",
-
+        
         // New roles (for system refactor)
+        "complianceOfficer",
         "auditor",
         "superAdmin",
         "groupAdmin",

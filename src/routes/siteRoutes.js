@@ -26,10 +26,7 @@ router.post(
   "/",
   auth,
   authorizeRoles(...can("SITE", "CREATE")),
-  [
-    body("name", "Site name is required").not().isEmpty(),
-    body("company", "Company ID is required").not().isEmpty(),
-  ],
+  [body("name", "Site name is required").not().isEmpty()],
   validate,
   siteController.createSite
 );
