@@ -50,28 +50,69 @@ export const getAllAuditSessions = asyncHandler(async (req, res, next) => {
     query.title = searchRegex; // Search in the optional title field
   }
 
-  // Step 5: Apply role-based access control
+  // Step 5: Apply role-based access control and scoping
   const userRole = req.user?.role;
   const userId = req.user?._id;
 
-  if (
-    userRole !== "admin" &&
-    userRole !== "sysadmin" &&
-    userRole !== "manager" &&
-    userRole !== "complianceOfficer"
-  ) {
-    // For non-admin users, filter sessions where they are team lead or team member
-    const userTeamSessions = await Team.find({
-      user: userId,
-      status: "active",
-    }).distinct("auditSession");
+  // Admin roles that can see all sessions (no filtering)
+  const fullAccessRoles = [
+    "admin",
+    "sysadmin",
+    "superAdmin",
+    "complianceOfficer",
+    "manager",
+    "approver", // Approvers need to see all sessions to close them
+  ];
 
-    // Include sessions where user is in team, lead auditor, or auditor
-    query.$or = [
-      { _id: { $in: userTeamSessions } }, // Sessions where user is in team
-      { leadAuditor: userId }, // Sessions where user is lead auditor
-      { auditor: userId }, // Sessions where user is auditor
-    ];
+  if (!fullAccessRoles.includes(userRole)) {
+    // For scoped admin roles, filter by their assigned scope
+    if (userRole === "groupAdmin") {
+      // Group Admin: see all sessions for sites in their group
+      if (req.user.assignedGroup) {
+        // Need to get all sites in the group and filter sessions by those sites
+        const Site = (await import("../models/Site.js")).default;
+        const Company = (await import("../models/Company.js")).default;
+
+        const companiesInGroup = await Company.find({
+          group: req.user.assignedGroup,
+        }).distinct("_id");
+
+        const sitesInGroup = await Site.find({
+          company: { $in: companiesInGroup },
+        }).distinct("_id");
+
+        query.site = { $in: sitesInGroup };
+      }
+    } else if (userRole === "companyAdmin") {
+      // Company Admin: see all sessions for sites in their company
+      if (req.user.assignedCompany) {
+        const Site = (await import("../models/Site.js")).default;
+        const sitesInCompany = await Site.find({
+          company: req.user.assignedCompany,
+        }).distinct("_id");
+
+        query.site = { $in: sitesInCompany };
+      }
+    } else if (userRole === "siteManager") {
+      // Site Manager: see only sessions for their assigned site
+      if (req.user.assignedSite) {
+        query.site = req.user.assignedSite;
+      }
+    } else {
+      // For regular users (auditors, problemOwners, etc.),
+      // filter sessions where they are team members, lead auditor, or auditor
+      const userTeamSessions = await Team.find({
+        user: userId,
+        status: "active",
+      }).distinct("auditSession");
+
+      // Include sessions where user is in team, lead auditor, or auditor
+      query.$or = [
+        { _id: { $in: userTeamSessions } }, // Sessions where user is in team
+        { leadAuditor: userId }, // Sessions where user is lead auditor
+        { auditor: userId }, // Sessions where user is auditor
+      ];
+    }
   }
 
   // Step 6: Find data, populate relationships, and sort
@@ -305,5 +346,67 @@ export const deleteAuditSession = asyncHandler(async (req, res, next) => {
     message: "Audit session deleted successfully",
     success: true,
     data: deletedAuditSession,
+  });
+});
+
+// POST /api/audit-sessions/:id/close - Close an audit session
+export const closeAuditSession = asyncHandler(async (req, res, next) => {
+  const { id } = req.params;
+  const { closureNotes } = req.body;
+
+  // Find the audit session
+  const auditSession = await AuditSession.findById(id);
+  if (!auditSession) {
+    throw new AppError("Audit session not found", 404);
+  }
+
+  // Check if already closed
+  if (auditSession.workflowStatus === "completed") {
+    throw new AppError("Audit session is already closed", 400);
+  }
+
+  // Validation: Check if all problems are resolved
+  const Problem = (await import("../models/Problem.js")).default;
+  const unresolvedProblems = await Problem.find({
+    auditSession: id,
+    problemStatus: { $nin: ["Closed", "Resolved"] },
+  });
+
+  if (unresolvedProblems.length > 0) {
+    throw new AppError(
+      `Cannot close audit. ${unresolvedProblems.length} problem(s) still unresolved. Please resolve all problems before closing the audit.`,
+      400
+    );
+  }
+
+  // Update audit session to completed and lock it
+  const closedSession = await AuditSession.findByIdAndUpdate(
+    id,
+    {
+      workflowStatus: "completed",
+      endDate: new Date(),
+      isLocked: true, // ✅ Lock the audit
+      closedBy: req.user._id, // ✅ Track who closed it
+      closedAt: new Date(), // ✅ Track when closed
+      closureNotes: closureNotes || "", // ✅ Save closure notes
+      ...updatedBy(req),
+    },
+    { new: true, runValidators: true }
+  )
+    .populate("template", "title version")
+    .populate("site", "name")
+    .populate("checkType", "name")
+    .populate("schedule", "title scheduledDate")
+    .populate("leadAuditor", "name email")
+    .populate("auditor", "name email")
+    .populate("closedBy", "name email") // ✅ Populate who closed it
+    .populate("createdBy", "name email")
+    .populate("updatedBy", "name email");
+
+  res.status(200).json({
+    data: closedSession,
+    message: "Audit session closed successfully and locked",
+    success: true,
+    closureNotes: closureNotes || "No closure notes provided",
   });
 });

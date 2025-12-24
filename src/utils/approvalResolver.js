@@ -25,18 +25,28 @@ export const resolveApproverByBusinessRules = async (
     // Get potential approvers for other roles (auditors, compliance officers, etc.)
     const potentialApprovers = await User.find({
       role: {
-        $in: ["manager", "complianceOfficer", "admin", "sysadmin"],
+        $in: ["manager", "complianceOfficer", "admin", "sysadmin", "approver"],
       },
       isActive: true,
     }).sort({ createdAt: -1 });
 
     if (potentialApprovers.length === 0) {
       throw new Error(
-        "No active approvers found. Please ensure there are users with manager, compliance, or admin roles."
+        "No active approvers found. Please ensure there are users with manager, compliance, admin, or approver roles."
       );
     }
 
     // Priority rules for non-admin users
+    // 1. Try to find a dedicated approver first
+    const dedicatedApprover = potentialApprovers.find(
+      (user) => user.role === "approver"
+    );
+    if (dedicatedApprover) {
+      console.log(`✅ Using dedicated approver: ${dedicatedApprover.name}`);
+      return dedicatedApprover._id;
+    }
+
+    // 2. Fallback to audit manager
     const auditManager = potentialApprovers.find(
       (user) => user.role === "manager"
     );

@@ -30,6 +30,7 @@ export const PERMISSIONS = {
       ROLES.SYSADMIN,
       ROLES.ADMIN,
       ROLES.MANAGER,
+      ROLES.APPROVER,
     ],
     CREATE: [
       ROLES.SYSADMIN,
@@ -144,7 +145,7 @@ export const PERMISSIONS = {
 
   // Questions
   QUESTION: {
-    VIEW: [ROLES.SUPER_ADMIN, ROLES.GROUP_ADMIN, ROLES.AUDITOR],
+    VIEW: [ROLES.SUPER_ADMIN, ROLES.GROUP_ADMIN, ROLES.AUDITOR, ROLES.APPROVER, ROLES.COMPANY_ADMIN],
     CREATE: [
       ROLES.SYSADMIN,
       ROLES.ADMIN,
@@ -152,6 +153,7 @@ export const PERMISSIONS = {
       ROLES.COMPLIANCE_OFFICER,
       ROLES.GROUP_ADMIN,
       ROLES.SUPER_ADMIN,
+  
     ],
     UPDATE: [
       ROLES.SYSADMIN,
@@ -264,6 +266,7 @@ export const PERMISSIONS = {
       ROLES.GROUP_ADMIN,
       ROLES.COMPANY_ADMIN,
       ROLES.AUDITOR,
+      ROLES.APPROVER, // Approvers need to view sessions to close them
     ],
     CREATE: [
       ROLES.SYSADMIN,
@@ -301,6 +304,7 @@ export const PERMISSIONS = {
       ROLES.SYSADMIN,
       ROLES.ADMIN,
       ROLES.MANAGER,
+      ROLES.APPROVER, // Approvers need to see team members on audit session pages
     ],
     CREATE: [
       ROLES.SYSADMIN,
@@ -335,6 +339,8 @@ export const PERMISSIONS = {
       ROLES.SYSADMIN,
       ROLES.ADMIN,
       ROLES.MANAGER,
+      ROLES.APPROVER,
+      ROLES.COMPANY_ADMIN
     ],
     CREATE: [
       ROLES.SYSADMIN,
@@ -435,6 +441,7 @@ export const PERMISSIONS = {
       ROLES.MANAGER,
       ROLES.AUDITOR,
       ROLES.SUPER_ADMIN,
+      ROLES.PROBLEM_OWNER,
     ],
     UPDATE: [
       ROLES.SYSADMIN,
@@ -569,6 +576,7 @@ export const PERMISSIONS = {
       ROLES.COMPLIANCE_OFFICER,
       ROLES.GROUP_ADMIN,
       ROLES.SUPER_ADMIN,
+      
     ],
     ASSIGN: [
       ROLES.SYSADMIN,

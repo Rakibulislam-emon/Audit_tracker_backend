@@ -1,10 +1,9 @@
-
-
 import { Router } from "express";
 import { can } from "../config/permissions.js";
 import * as auditSessionController from "../controllers/auditSessionController.js";
 import auth from "../middleware/auth.js";
 import authorizeRoles from "../middleware/authorizeRoles.js";
+import { protectClosedAudit } from "../middleware/protectClosedAudit.js"; // ✅ Import protection middleware
 
 const router = Router();
 
@@ -37,6 +36,7 @@ router.patch(
   "/:id",
   auth,
   authorizeRoles(...can("AUDIT_SESSION", "UPDATE")),
+  protectClosedAudit, // ✅ Protect locked audits
   auditSessionController.updateAuditSession
 );
 
@@ -45,7 +45,16 @@ router.delete(
   "/:id",
   auth,
   authorizeRoles(...can("AUDIT_SESSION", "DELETE")),
+  protectClosedAudit, // ✅ Protect locked audits
   auditSessionController.deleteAuditSession
+);
+
+// POST /api/audit-sessions/:id/close - Close Session (Approver only)
+router.post(
+  "/:id/close",
+  auth,
+  authorizeRoles("approver", "admin", "sysadmin", "superAdmin"),
+  auditSessionController.closeAuditSession
 );
 
 export default router;

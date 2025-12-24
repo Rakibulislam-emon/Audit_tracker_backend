@@ -128,10 +128,10 @@ export const createFixAction = asyncHandler(async (req, res, next) => {
   let savedFixAction = await newFixAction.save();
 
   // 1. Link this FixAction back to the Problem document
-  // 2. Update Problem Status to 'fix_submitted'
+  // 2. Update Problem Status to 'In Progress'
   await Problem.findByIdAndUpdate(problem, {
     $addToSet: { fixActions: savedFixAction._id },
-    $set: { problemStatus: "fix_submitted" },
+    $set: { problemStatus: "In Progress" }, // Changed from "fix_submitted" to "In Progress"
   });
 
   // 3. Create an Approval Request for this Fix Action
