@@ -342,9 +342,13 @@ const canUserApprove = (approval, user) => {
     return true;
   }
 
-  // RULE 1.5: Admins and SysAdmins have superuser approval authority
-  if (["admin", "sysadmin"].includes(user.role)) {
-    console.log(`✅ Admin/SysAdmin override for approval`);
+  // RULE 1.5: Admins, SysAdmins, and Approvers have approval authority
+  if (
+    ["admin", "sysadmin", "approver", "superAdmin", "groupAdmin"].includes(
+      user.role
+    )
+  ) {
+    console.log(`✅ ${user.role} approval authority`);
     return true;
   }
 
@@ -435,7 +439,7 @@ export const approveRequest = async (req, res) => {
     // Update the related entity's system status to "active"
     await updateEntityStatus(approval.entityType, approval.entityId, "active");
 
-    // 🔧 NEW: If this is a FixAction approval, update the related Problem status to "Resolved"
+    // 🔧 NEW: If this is a FixAction approval, update verification fields AND problem status
     if (approval.entityType === "FixAction") {
       try {
         const FixAction = (await import("../models/FixAction.js")).default;
@@ -446,23 +450,36 @@ export const approveRequest = async (req, res) => {
           "problem"
         );
 
-        if (fixAction && fixAction.problem) {
-          // Update problem status to "Resolved" when fix action is approved
-          await Problem.findByIdAndUpdate(
-            fixAction.problem._id || fixAction.problem,
-            {
-              problemStatus: "Resolved",
-            }
-          );
+        if (fixAction) {
+          // ✅ AUTO-POPULATE VERIFICATION FIELDS when approved
+          await FixAction.findByIdAndUpdate(approval.entityId, {
+            verifiedBy: userId,
+            verifiedAt: new Date(),
+            verificationResult: "Effective", // Default to Effective, can be changed later
+            actionStatus: "Verified", // Change status to Verified
+          });
           console.log(
-            `✅ Problem ${
-              fixAction.problem._id || fixAction.problem
-            } status updated to "Resolved"`
+            `✅ FixAction ${approval.entityId} verification fields auto-populated`
           );
+
+          // Update related problem status to "Resolved"
+          if (fixAction.problem) {
+            await Problem.findByIdAndUpdate(
+              fixAction.problem._id || fixAction.problem,
+              {
+                problemStatus: "Resolved",
+              }
+            );
+            console.log(
+              `✅ Problem ${
+                fixAction.problem._id || fixAction.problem
+              } status updated to "Resolved"`
+            );
+          }
         }
       } catch (error) {
-        console.error("Error updating problem status:", error);
-        // Don't fail the approval if problem update fails
+        console.error("Error updating fix action verification:", error);
+        // Don't fail the approval if verification update fails
       }
     }
 
