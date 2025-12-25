@@ -69,6 +69,28 @@ const auditSessionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+
+    // ===== AUDIT CLOSURE FIELDS =====
+    isLocked: {
+      type: Boolean,
+      default: false,
+      index: true, // For quick filtering of locked audits
+    },
+    closedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: false,
+    },
+    closedAt: {
+      type: Date,
+      required: false,
+    },
+    closureNotes: {
+      type: String,
+      trim: true,
+      maxlength: [500, "Closure notes cannot exceed 500 characters."],
+    },
+
     ...commonFields, // status (active/inactive), createdBy, updatedBy
   },
   {

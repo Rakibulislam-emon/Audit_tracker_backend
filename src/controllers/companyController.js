@@ -2,6 +2,7 @@ import Company from "../models/Company.js";
 import { createdBy, updatedBy } from "../utils/helper.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
+import { validateEntityCreation } from "../utils/authority.js";
 
 // GET /api/companies
 export const getAllCompanies = asyncHandler(async (req, res, next) => {
@@ -69,13 +70,21 @@ export const getCompanyById = asyncHandler(async (req, res, next) => {
 export const createCompany = asyncHandler(async (req, res, next) => {
   const { name, group, sector, address } = req.body;
 
-  if (!name || !group) {
+  // INTELLIGENT AUTO-FILL: Fill group from requester if missing (for jailed admins)
+  const finalGroup =
+    group ||
+    (req.user.assignedGroup ? req.user.assignedGroup.toString() : null);
+
+  if (!name || !finalGroup) {
     throw new AppError("Name and group are required", 400);
   }
 
+  // Authority Validation
+  validateEntityCreation(req.user, "company", { group: finalGroup });
+
   const newCompany = new Company({
     name,
-    group,
+    group: finalGroup,
     sector,
     address,
     ...createdBy(req),

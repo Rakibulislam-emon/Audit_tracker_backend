@@ -49,6 +49,7 @@ export const getAllFixActions = asyncHandler(async (req, res, next) => {
   // Step 5: Find data, populate relationships, and sort
   const fixActions = await FixAction.find(query)
     .populate("problem", "title problemStatus")
+    .populate("observation", "questionText severity")
     .populate("owner", "name email")
     .populate("verifiedBy", "name email")
     .populate("createdBy", "name email")
@@ -70,6 +71,7 @@ export const getAllFixActions = asyncHandler(async (req, res, next) => {
 export const getFixActionById = asyncHandler(async (req, res, next) => {
   const fixAction = await FixAction.findById(req.params.id)
     .populate("problem", "title problemStatus")
+    .populate("observation", "questionText severity")
     .populate("owner", "name email")
     .populate("verifiedBy", "name email")
     .populate("createdBy", "name email")
@@ -128,10 +130,10 @@ export const createFixAction = asyncHandler(async (req, res, next) => {
   let savedFixAction = await newFixAction.save();
 
   // 1. Link this FixAction back to the Problem document
-  // 2. Update Problem Status to 'fix_submitted'
+  // 2. Update Problem Status to 'In Progress'
   await Problem.findByIdAndUpdate(problem, {
     $addToSet: { fixActions: savedFixAction._id },
-    $set: { problemStatus: "fix_submitted" },
+    $set: { problemStatus: "In Progress" }, // Changed from "fix_submitted" to "In Progress"
   });
 
   // 3. Create an Approval Request for this Fix Action
@@ -181,6 +183,7 @@ export const createFixAction = asyncHandler(async (req, res, next) => {
   // Repopulate for response
   savedFixAction = await FixAction.findById(savedFixAction._id)
     .populate("problem", "title problemStatus")
+    .populate("observation", "questionText severity")
     .populate("owner", "name email")
     .populate("verifiedBy", "name email")
     .populate("createdBy", "name email")
@@ -272,6 +275,7 @@ export const updateFixAction = asyncHandler(async (req, res, next) => {
   // Repopulate for response
   updatedFixAction = await FixAction.findById(updatedFixAction._id)
     .populate("problem", "title problemStatus")
+    .populate("observation", "questionText severity")
     .populate("owner", "name email")
     .populate("verifiedBy", "name email")
     .populate("createdBy", "name email")
