@@ -434,6 +434,7 @@ export const PERMISSIONS = {
       ROLES.SITE_MANAGER,
       ROLES.AUDITOR,
       ROLES.PROBLEM_OWNER,
+      ROLES.APPROVER,
     ],
     CREATE: [
       ROLES.SYSADMIN,
