@@ -1,6 +1,7 @@
 import express from "express";
 import {
   deleteUser,
+  demoLogin,
   getAllUsers,
   getUserById,
   loginUser,
@@ -48,6 +49,8 @@ router.post(
   validate,
   loginUser
 );
+
+router.post("/demo-login", demoLogin);
 
 router.patch(
   "/:id",

@@ -75,6 +75,36 @@ const reportSchema = new mongoose.Schema(
       ], // ✅ ADDED pending_approval
       default: "generating",
     },
+    // Export tracking and customization
+    exportMetadata: {
+      lastExported: Date,
+      exportCount: { type: Number, default: 0 },
+      formats: [
+        {
+          type: {
+            type: String,
+            enum: ["pdf", "excel", "csv", "json"],
+          },
+          exportedAt: { type: Date, default: Date.now },
+          fileSize: Number,
+          exportedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+          },
+        },
+      ],
+    },
+    template: {
+      type: String,
+      enum: ["standard", "executive", "detailed", "custom"],
+      default: "standard",
+    },
+    branding: {
+      logo: String, // URL or path to logo
+      companyName: String,
+      footerText: String,
+      primaryColor: { type: String, default: "#2563eb" },
+    },
     filePath: String, // If report is saved as PDF
     fileName: String,
     fileSize: Number,

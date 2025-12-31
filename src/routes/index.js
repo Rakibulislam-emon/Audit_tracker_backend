@@ -24,6 +24,7 @@ import userRoutes from "./userRoutes.js";
 // ... existing imports
 import dashboardRoutes from "./dashboardRoutes.js";
 import questionAssignmentRoutes from "./questionAssignmentRoutes.js";
+import exportRoutes from "./exportRoutes.js";
 
 router.use("/api/users", userRoutes);
 
@@ -44,6 +45,7 @@ router.use("/api/fix-actions", fixAction);
 
 router.use("/api/proofs", proofRoutes);
 
+router.use("/api/reports", exportRoutes); // Export routes (must come first to avoid /:id conflict)
 router.use("/api/reports", reportRoutes);
 
 router.use("/api/approvals", approvalRoutes);

@@ -12,7 +12,10 @@ const globalErrorHandler = (err, req, res, next) => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";
 
-  if (process.env.NODE_ENV === "development") {
+  // FORCE DEBUG: Always send detailed error
+  if (true || process.env.NODE_ENV === "development") {
+    console.log("!!! GLOBAL ERROR CAUGHT !!!");
+    console.error(err);
     sendErrorDev(err, res);
   } else {
     // Production mode: Send clean, operational errors to client
