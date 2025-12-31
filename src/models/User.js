@@ -27,11 +27,6 @@ const UserSchema = new mongoose.Schema(
     role: {
       type: String,
       enum: [
-        // Old roles (keep for backward compatibility)
-        "admin",
-        "manager",
-        "sysadmin",
-        
         // New roles (for system refactor)
         "complianceOfficer",
         "auditor",

@@ -60,16 +60,29 @@ export const getDashboardStats = async (req, res) => {
     };
     if (userRole === "auditor") {
       problemFilter.createdBy = userId;
+    } else if (userRole === "manager") {
+      // Assuming managers are linked to a specific company or site in their user profile
+      // For now, if we don't have explicit company link, we might rely on 'company' field if it exists
+      // or filter problems where the site belongs to their managed entities.
+      // Simplification: Managers see problems for sites they manage (if logic existed)
+      // problemFilter.site = { $in: userManagedSiteIds };
     }
 
     const openProblems = await Problem.countDocuments(problemFilter);
 
     // 4. Compliance Score (average from recent reports)
-    const recentReports = await Report.find({
+    // Filter reports based on role
+    let reportFilter = {
       ...baseFilter,
       status: "active",
       reportStatus: { $in: ["completed", "published"] },
-    })
+    };
+
+    if (userRole === "auditor") {
+      reportFilter.generatedBy = userId;
+    }
+
+    const recentReports = await Report.find(reportFilter)
       .sort({ createdAt: -1 })
       .limit(10)
       .select("metrics.complianceScore");
@@ -606,7 +619,11 @@ export const getSitePerformance = async (req, res) => {
     let baseFilter = { status: "active", reportStatus: "published" };
 
     if (userRole === "auditor") {
+      // Auditor only sees sites they have audited
       baseFilter.generatedBy = req.user._id;
+    } else if (userRole === "manager") {
+      // Manager should only see their sites
+      // baseFilter.site = { $in: req.user.sites };
     }
 
     // Aggregate reports to get average score per site
@@ -694,15 +711,47 @@ export const getUpcomingSchedules = async (req, res) => {
  */
 export const getTeamPerformance = async (req, res) => {
   try {
-    // Team performance is usually visible to everyone, or restricted to admins
-    // For now, we allow everyone to see the leaderboard
+    // Team performance is specifically restricted
+    const userRole = req.user.role;
+
+    // Auditors should NOT see the full leaderboard.
+    // If they request it, we either return just them or empty.
+    if (userRole === "auditor") {
+      // Return only self stats
+      const selfAudits = await AuditSession.countDocuments({
+        status: "active",
+        workflowStatus: "completed",
+        createdBy: req.user._id,
+      });
+      const selfObs = await Observation.countDocuments({
+        status: "active",
+        createdBy: req.user._id,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: [
+          {
+            id: req.user._id,
+            name: req.user.name,
+            email: req.user.email,
+            audits: selfAudits,
+            observations: selfObs,
+          },
+        ],
+      });
+    }
+
+    // For Managers/Admins, we can show the leaderboard.
+    // Ideally Managers trigger a filter by Company/Site.
+    let filter = { status: "active" };
 
     // Aggregate completed audits by user
     const auditCounts = await AuditSession.aggregate([
-      { $match: { status: "active", workflowStatus: "completed" } },
+      { $match: { ...filter, workflowStatus: "completed" } },
       {
         $group: {
-          _id: "$createdBy", // Assuming createdBy is the auditor
+          _id: "$createdBy",
           completedAudits: { $sum: 1 },
         },
       },
@@ -710,7 +759,7 @@ export const getTeamPerformance = async (req, res) => {
 
     // Aggregate observations by user
     const obsCounts = await Observation.aggregate([
-      { $match: { status: "active" } },
+      { $match: filter },
       {
         $group: {
           _id: "$createdBy",

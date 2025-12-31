@@ -116,6 +116,52 @@ const loginUser = asyncHandler(async (req, res, next) => {
     assignedGroup: user.assignedGroup,
     assignedCompany: user.assignedCompany,
     assignedSite: user.assignedSite,
+    isReadOnly: false,
+    token,
+  });
+});
+
+// @desc Login as Super Admin (Demo Mode)
+// @route POST /api/users/demo-login
+// @access Public
+const demoLogin = asyncHandler(async (req, res, next) => {
+  const email = "superadmin@example.com";
+
+  // Check if user exists
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new AppError(
+      "Demo account not found. Please seed the database.",
+      404
+    );
+  }
+
+  // Generate token with isReadOnly: true
+  const token = jwt.sign(
+    { id: user._id, role: user.role, email: user.email, isReadOnly: true },
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" } // Demo sessions are shorter
+  );
+
+  // Set cookie for token (matching regular login)
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 24 * 60 * 60 * 1000, // 1 day
+  });
+
+  // Send response
+  res.json({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    scopeLevel: user.scopeLevel,
+    assignedGroup: user.assignedGroup,
+    assignedCompany: user.assignedCompany,
+    assignedSite: user.assignedSite,
+    isReadOnly: true,
     token,
   });
 });
@@ -258,6 +304,7 @@ export {
   getAllUsers,
   getUserById,
   loginUser,
+  demoLogin,
   logoutUser,
   registerUser,
   updateUser,
