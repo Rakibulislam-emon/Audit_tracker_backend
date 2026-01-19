@@ -36,7 +36,7 @@ app.use(cookieParser());
 app.use(
   morgan("combined", {
     stream: { write: (message) => logger.info(message.trim()) },
-  })
+  }),
 );
 
 app.use(
@@ -55,30 +55,25 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 
 // Rate Limiting
 import { globalLimiter } from "./middleware/rateLimiter.js";
 app.use("/api", globalLimiter); // Apply to all API routes
 
-// Connect to MongoDB
-connectDB();
+// Middleware to lazily connect to DB
+const ensureDBConnection = async (req, res, next) => {
+  await connectDB();
+  next();
+};
 
-// Routes
-app.use("/", routes);
+// Routes (with lazy DB connection for API routes)
+app.use("/api", ensureDBConnection, routes);
 
-// Health check
+// Health check (fast, no DB, instant response)
 app.get("/health", (req, res) => {
-  const dbStatus =
-    mongoose.connection.readyState === 1 ? "connected" : "disconnected";
-  res.status(200).json({
-    status: "success",
-    message: "Audit Tracker API is running",
-    timestamp: new Date().toISOString(),
-    database: dbStatus,
-    uptime: process.uptime(),
-  });
+  res.status(200).send("ok");
 });
 
 // Graceful Shutdown
@@ -95,7 +90,7 @@ const gracefulShutdown = () => {
   // Force close server after 10 secs
   setTimeout(() => {
     logger.error(
-      "Could not close connections in time, forcefully shutting down"
+      "Could not close connections in time, forcefully shutting down",
     );
     process.exit(1);
   }, 10000);
