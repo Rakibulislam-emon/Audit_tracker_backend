@@ -26,32 +26,32 @@ import dashboardRoutes from "./dashboardRoutes.js";
 import questionAssignmentRoutes from "./questionAssignmentRoutes.js";
 import exportRoutes from "./exportRoutes.js";
 
-router.use("/api/users", userRoutes);
+router.use("/users", userRoutes);
 
-router.use("/api/groups", groupRoutes);
-router.use("/api/companies", companyRoutes);
-router.use("/api/sites", siteRoutes);
-router.use("/api/checkTypes", checkTypeRoutes);
-router.use("/api/rules", ruleRoutes);
-router.use("/api/questions", questionRoutes);
-router.use("/api/templates", templateRoutes);
-router.use("/api/programs", programRoutes);
-router.use("/api/schedules", scheduleRoutes);
-router.use("/api/auditSessions", auditSessionRoutes);
-router.use("/api/teams", teamRoutes);
-router.use("/api/observations", observationRoutes);
-router.use("/api/problems", problemRoutes);
-router.use("/api/fix-actions", fixAction);
+router.use("/groups", groupRoutes);
+router.use("/companies", companyRoutes);
+router.use("/sites", siteRoutes);
+router.use("/checkTypes", checkTypeRoutes);
+router.use("/rules", ruleRoutes);
+router.use("/questions", questionRoutes);
+router.use("/templates", templateRoutes);
+router.use("/programs", programRoutes);
+router.use("/schedules", scheduleRoutes);
+router.use("/auditSessions", auditSessionRoutes);
+router.use("/teams", teamRoutes);
+router.use("/observations", observationRoutes);
+router.use("/problems", problemRoutes);
+router.use("/fix-actions", fixAction);
 
-router.use("/api/proofs", proofRoutes);
+router.use("/proofs", proofRoutes);
 
-router.use("/api/reports", exportRoutes); // Export routes (must come first to avoid /:id conflict)
-router.use("/api/reports", reportRoutes);
+router.use("/reports", exportRoutes); // Export routes (must come first to avoid /:id conflict)
+router.use("/reports", reportRoutes);
 
-router.use("/api/approvals", approvalRoutes);
+router.use("/approvals", approvalRoutes);
 
-router.use("/api/dashboard", dashboardRoutes);
-router.use("/api/metrics", metricRoutes);
-router.use("/api/question-assignments", questionAssignmentRoutes);
+router.use("/dashboard", dashboardRoutes);
+router.use("/metrics", metricRoutes);
+router.use("/question-assignments", questionAssignmentRoutes);
 
 export default router;
